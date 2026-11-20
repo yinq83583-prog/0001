@@ -41,6 +41,15 @@ int main() {
     assert(connected.downward_connectors==0);
     assert(connected.triangles.size()==8); // 6 side + 2 conformal caps
 
+    // Distant painted islands are not accidentally joined.
+    const std::vector<Triangle> distant={
+        {{0,0,3},{10,0,3},{0,10,3}},
+        {{0,0,40},{0,10,40},{10,0,40}}
+    };
+    auto distant_result=generate_connectors(distant);
+    assert(distant_result.bridges==0);
+    assert(distant_result.downward_connectors==2);
+
     // Same-facing patches must never create a bridge.
     const std::vector<Triangle> same_facing={
         {{0,0,3},{10,0,3},{0,10,3}},

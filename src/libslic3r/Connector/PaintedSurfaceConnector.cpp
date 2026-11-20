@@ -147,10 +147,37 @@ void append_cap(std::vector<Triangle>& dst,const Region& region,Vec3 offset) {
     for(const Triangle& tri:region.facets)
         dst.push_back({add(tri.a,offset),add(tri.c,offset),add(tri.b,offset)});
 }
+std::vector<Vec3> resample_loop(const std::vector<Vec3>& loop,std::size_t count) {
+    if(loop.size()<3||count<3)return {};
+    std::vector<double> cumulative(loop.size()+1,0.0);
+    for(std::size_t i=0;i<loop.size();++i)
+        cumulative[i+1]=cumulative[i]+len(sub(loop[(i+1)%loop.size()],loop[i]));
+    const double perimeter=cumulative.back();
+    if(perimeter<=1e-9)return {};
+    std::vector<Vec3> result;
+    result.reserve(count);
+    std::size_t edge_index=0;
+    for(std::size_t i=0;i<count;++i) {
+        const double target=perimeter*static_cast<double>(i)/static_cast<double>(count);
+        while(edge_index+1<loop.size()&&cumulative[edge_index+1]<target)
+            ++edge_index;
+        const double edge_length=cumulative[edge_index+1]-cumulative[edge_index];
+        const double t=edge_length>1e-12?(target-cumulative[edge_index])/edge_length:0.0;
+        result.push_back(add(loop[edge_index],
+            mul(sub(loop[(edge_index+1)%loop.size()],loop[edge_index]),t)));
+    }
+    return result;
+}
 bool bridge_regions(const Region& a,const Region& b,double gap,std::vector<Triangle>& out) {
     std::vector<Vec3> aa,bb;
-    if(!get_boundary(a,aa)||!get_boundary(b,bb)||aa.size()!=bb.size())return false;
-    if(aa.size()>4096)return false;
+    if(!get_boundary(a,aa)||!get_boundary(b,bb))return false;
+    // Painted patches often come from different triangulations. Resample both
+    // closed boundary loops by perimeter so compatible outlines do not fall
+    // back to vertical columns merely because their vertex counts differ.
+    const std::size_t boundary_count=std::min<std::size_t>(2048,std::max(aa.size(),bb.size()));
+    aa=resample_loop(aa,boundary_count);
+    bb=resample_loop(bb,boundary_count);
+    if(aa.size()<3||bb.size()<3||aa.size()!=bb.size())return false;
     const Vec3 oa=mul(a.normal,gap),ob=mul(b.normal,gap);
     for(auto& v:aa)v=add(v,oa);
     for(auto& v:bb)v=add(v,ob);

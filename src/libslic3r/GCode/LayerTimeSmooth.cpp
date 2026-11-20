@@ -12,7 +12,7 @@
 #include <sstream>
 #include <utility>
 
-namespace Slic3r::GCode {
+namespace Slic3r::GCodeSmoothing {
 namespace {
 struct LayerStats {
     double total = 0.0;
@@ -750,4 +750,4 @@ bool LayerTimeSmooth::process(
         *report = result;
     return true;
 }
-} // namespace Slic3r::GCode
+} // namespace Slic3r::GCodeSmoothing

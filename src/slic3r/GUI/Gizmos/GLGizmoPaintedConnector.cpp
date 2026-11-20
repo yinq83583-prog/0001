@@ -46,6 +46,14 @@
 
 namespace Slic3r::GUI {
 
+namespace {
+constexpr const char* GENERATED_CONNECTOR_VOLUME_NAME = "Painted Surface Connector";
+bool is_generated_connector_volume(const ModelVolume* volume)
+{
+    return volume != nullptr && volume->name == GENERATED_CONNECTOR_VOLUME_NAME;
+}
+}
+
 void GLGizmoPaintedConnector::on_shutdown()
 {
     m_parent.use_slope(false);
@@ -301,7 +309,7 @@ void GLGizmoPaintedConnector::on_render_input_window(float x, float y, float bot
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _u8L("Reset selection"), UndoRedo::SnapshotType::GizmoAction);
         int                  idx = -1;
         for (ModelVolume *mv : mo->volumes)
-            if (mv->is_model_part()) {
+            if (mv->is_model_part() && !is_generated_connector_volume(mv)) {
                 ++idx;
                 m_triangle_selectors[idx]->reset();
                 m_triangle_selectors[idx]->request_update_render_data(true);
@@ -314,9 +322,9 @@ void GLGizmoPaintedConnector::on_render_input_window(float x, float y, float bot
 
     ImGui::SameLine();
     const bool has_generated_connectors = std::any_of(mo->volumes.begin(), mo->volumes.end(),
-        [](const ModelVolume* volume) { return volume->name == "Painted Surface Connector"; });
-    m_imgui->disabled_begin(!mo->is_connector_painted() || mo->instances.size() != 1 || m_parent.get_canvas_type() == GLCanvas3D::CanvasAssembleView || has_generated_connectors);
-    if (m_imgui->button(_L("Generate connectors")))
+        [](const ModelVolume* volume) { return is_generated_connector_volume(volume); });
+    m_imgui->disabled_begin(!mo->is_connector_painted() || mo->instances.size() != 1 || m_parent.get_canvas_type() == GLCanvas3D::CanvasAssembleView);
+    if (m_imgui->button(has_generated_connectors ? _L("Regenerate connectors") : _L("Generate connectors")))
         generate_connectors();
     m_imgui->disabled_end();
 
@@ -339,7 +347,7 @@ void GLGizmoPaintedConnector::update_model_object()
     ModelObject *mo      = m_c->selection_info()->model_object();
     int          idx     = -1;
     for (ModelVolume *mv : mo->volumes) {
-        if (!mv->is_model_part())
+        if (!mv->is_model_part() || is_generated_connector_volume(mv))
             continue;
 
         ++idx;
@@ -367,7 +375,7 @@ void GLGizmoPaintedConnector::update_from_model_object(bool first_update)
     ebt_colors.push_back(TriangleSelectorGUI::enforcers_color);
     ebt_colors.push_back(TriangleSelectorGUI::blockers_color);
     for (const ModelVolume *mv : mo->volumes) {
-        if (!mv->is_model_part())
+        if (!mv->is_model_part() || is_generated_connector_volume(mv))
             continue;
 
         ++volume_id;
@@ -398,10 +406,7 @@ void GLGizmoPaintedConnector::generate_connectors()
     ModelObject* mo = m_c->selection_info() ? m_c->selection_info()->model_object() : nullptr;
     if (!mo || mo->instances.size() != 1 || m_parent.get_canvas_type() == GLCanvas3D::CanvasAssembleView || m_triangle_selectors.empty())
         return;
-    if (std::any_of(mo->volumes.begin(), mo->volumes.end(),
-        [](const ModelVolume* volume) { return volume->name == "Painted Surface Connector"; }))
-        return;
-
+ 
     wxBusyCursor wait;
     const Selection& selection = m_parent.get_selection();
     const std::size_t instance_idx = selection.get_instance_idx();
@@ -413,7 +418,7 @@ void GLGizmoPaintedConnector::generate_connectors()
     std::size_t selector_idx = 0;
 
     for (const ModelVolume* volume : mo->volumes) {
-        if (!volume->is_model_part())
+        if (!volume->is_model_part() || is_generated_connector_volume(volume))
             continue;
         if (selector_idx >= m_triangle_selectors.size())
             return;
@@ -465,11 +470,17 @@ void GLGizmoPaintedConnector::generate_connectors()
         _u8L("Generate Painted Surface Connector"),
         UndoRedo::SnapshotType::GizmoAction);
 
+    // Replace any previous generated connector only after the new mesh has
+    // been generated successfully, so a failed regeneration keeps the old part.
+    for (std::size_t i = mo->volumes.size(); i-- > 0;)
+        if (is_generated_connector_volume(mo->volumes[i]))
+            mo->delete_volume(i);
+
     ModelVolume* connector_volume = mo->add_volume(std::move(connector_mesh), ModelVolumeType::MODEL_PART, false);
     if (!connector_volume)
         return;
 
-    connector_volume->name = "Painted Surface Connector";
+    connector_volume->name = GENERATED_CONNECTOR_VOLUME_NAME;
     connector_volume->set_type(ModelVolumeType::MODEL_PART);
     mo->invalidate_bounding_box();
 

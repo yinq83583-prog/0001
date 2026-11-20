@@ -53,7 +53,7 @@ int main() {
     assert(resampled_bridge.regions==2);
     assert(resampled_bridge.bridges==1);
     assert(resampled_bridge.downward_connectors==0);
-    assert(resampled_bridge.triangles.size()==20);
+    assert(resampled_bridge.triangles.size()==14); // 9 zipper sides + 5 original cap faces
 
     // Distant painted islands are not accidentally joined.
     const std::vector<Triangle> distant={

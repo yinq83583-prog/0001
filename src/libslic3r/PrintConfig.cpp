@@ -6826,13 +6826,6 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
 
-    def = this->add("layer_time_smooth_max_variation", coFloat);
-    def->label = L("Maximum layer-time variation");
-    def->category = L("Cooling");
-    def->sidetext = L("%");
-    def->min = 5; def->max = 100; def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(25.0));
-
     def = this->add("layer_time_smooth_max_slowdown", coFloat);
     def->label = L("Maximum slowdown");
     def->category = L("Cooling");
@@ -6920,6 +6913,13 @@ void PrintConfigDef::init_fff_params()
     def->category = L("Cooling");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(true));
+
+    def = this->add("layer_time_smooth_manual_profile", coFloats);
+    def->label = L("Manual layer smoothing profile");
+    def->category = L("Cooling");
+    def->tooltip = L("64 normalized values from the bottom to the top of the model. 1 keeps full smoothing strength; 0 disables smoothing at that height.");
+    def->min = 0; def->max = 1; def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloats(64, 1.0));
 
     def = this->add("minimum_sparse_infill_area", coFloat);
     def->label = L("Minimum sparse infill threshold");

@@ -74,7 +74,10 @@ concurrency:
   group: build-all-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   # Pushes don't cancel a running build, because only a finished branch build
   # saves caches every pull request can restore.
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # Keep long-running source builds alive while incremental native module fixes
+  # are pushed to this development PR; otherwise dependency compilation is
+  # repeatedly cancelled before Windows x64 reaches the compiler.
+  cancel-in-progress: false
   
 
 jobs:

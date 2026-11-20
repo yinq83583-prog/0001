@@ -382,3 +382,29 @@ TEST_CASE("Seam metadata restores only recognized modes on compatible base types
         CHECK_FALSE(helper.config.has("notes"));
     }
 }
+
+TEST_CASE("Painted Surface Connector annotations survive a 3MF round trip", "[PaintedSurfaceConnector3mf]")
+{
+    const auto backend = GENERATE(Backend::Bbs, Backend::Prusa);
+    CAPTURE(int(backend));
+    Scene source;
+    source.populate(false);
+    ModelVolume &painted = *source.model.objects.front()->volumes.front();
+    painted.connector_facets.set_triangle_from_string(0, "1");
+    REQUIRE(painted.connector_facets.get_triangle_as_string(0) == "1");
+    REQUIRE(source.model.is_connector_painted());
+
+    ScopedTemporaryFile file(".3mf");
+    save(file.string(), backend, source);
+    Archive archive = read_archive(file.string());
+    const auto &xml = model_xml(archive, backend);
+    CHECK(xml.find("slic3rpe:connector_painting=\"1\"") != std::string::npos);
+
+    Scene destination;
+    load(file.string(), backend, destination);
+    REQUIRE(destination.model.objects.size() == 1);
+    REQUIRE(destination.model.objects.front()->volumes.size() == 2);
+    const ModelVolume &restored = *destination.model.objects.front()->volumes.front();
+    CHECK(restored.connector_facets.get_triangle_as_string(0) == "1");
+    CHECK(destination.model.is_connector_painted());
+}

@@ -112,3 +112,7 @@ The Windows ARM64 failure remains separate: MSVC 14.52 crashes internally (C1001
 The ARM64 dependency failure matches a reported regression in GitHub's `windows-11-vs2026-arm` runner image: MSVC 14.52.37025 crashes with C1001 in the compiler backend, while MSVC 14.44.35207 succeeds on the same image. The report reproduces the same compiler internal file (`Utc/src/p2/main.cpp`, line 281) as this run. Microsoft documents `-vcvars_ver=14.44` as the supported way to select an earlier installed toolset.
 
 `build_win.bat` now selects MSVC 14.44 for ARM64 only when the exact side-by-side toolset directory is present. Windows x64 and machines without that installation retain the normal default compiler. This avoids changing the x64 release toolchain while working around the hosted ARM64 compiler regression.
+
+## 3MF annotation regression test — 2026-11-20
+
+Added an integration-level 3MF round-trip test for Painted Surface Connector paint annotations using both the Bambu/BBS and Prusa 3MF backends. The test verifies the custom triangle attribute is written and that the same painted triangle is restored after import. This complements the standalone geometry tests; it still needs to run in the full OrcaSlicer test suite.

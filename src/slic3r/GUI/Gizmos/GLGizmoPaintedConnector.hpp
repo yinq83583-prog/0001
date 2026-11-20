@@ -29,9 +29,9 @@ protected:
 
     wxString handle_snapshot_action_name(bool shift_down, Button button_down) const override;
 
-    std::string get_gizmo_entering_text() const override { return _u8L("Entering Paint-on connector paint"); }
-    std::string get_gizmo_leaving_text() const override { return _u8L("Leaving Paint-on connector paint"); }
-    std::string get_action_snapshot_name() const override { return _u8L("Paint-on connector paint editing"); }
+    std::string get_gizmo_entering_text() const override { return _u8L("Entering Painted Surface Connector"); }
+    std::string get_gizmo_leaving_text() const override { return _u8L("Leaving Painted Surface Connector"); }
+    std::string get_action_snapshot_name() const override { return _u8L("Painted Surface Connector editing"); }
 
     EnforcerBlockerType get_left_button_state_type() const override { return EnforcerBlockerType::ENFORCER; }
     EnforcerBlockerType get_right_button_state_type() const override { return EnforcerBlockerType::NONE; }

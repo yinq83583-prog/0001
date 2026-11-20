@@ -1,6 +1,7 @@
 #include "LayerTimeSmooth.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <cctype>
 #include <cmath>
 #include <cstdlib>
@@ -8,9 +9,12 @@
 #include <map>
 #include <numeric>
 #include <iomanip>
+#include <ios>
 #include <regex>
 #include <sstream>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace Slic3r::GCodeSmoothing {
 namespace {

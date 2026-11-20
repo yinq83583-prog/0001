@@ -84,3 +84,15 @@ A code review found that a painted region on a vertical wall can collapse to a z
 The connector generator now validates every downward connector and bridge as a closed, consistently oriented, non-zero-volume triangle shell before adding it to the model. Downward connectors also reject painted regions that intersect or approach the build plate below the configured minimum height. Unsupported geometry is counted as skipped rather than emitted as a broken printable volume.
 
 Regression coverage added for vertical patches (must skip), sloped patches (must remain watertight), and patches intersecting the bed (must skip). The existing horizontal, facing-bridge, and mismatched-loop tests now check edge pairing, winding consistency, and non-zero signed volume.
+
+## CI log review and direct-include fixes — 2026-11-20
+
+Reviewed Build all run #26 and validation runs for head `3790bcde4b9af0f9c062bced37967918c62645a1`.
+
+- Native connector and layer-time-smooth tests (#144) passed, including compilation and execution of both standalone native test binaries.
+- Clang-Tidy (#32) successfully restored its dependency cache and configured. It then reported missing direct standard/library includes in the connector geometry source, layer-time-smooth source, and painted-connector gizmo. The source files were updated with the exact direct includes requested by include-cleaner: `<cstddef>`, `<vector>`, `<string>`, `<ios>`, `<iterator>`, and `libslic3r/Point.hpp`.
+- Windows ARM64 dependency build failed inside the third-party OCCT dependency: MSVC 14.52 emitted fatal internal compiler error C1001 in `BRepGraph_LayerTopoSupplement.cxx:32`, followed by an access violation. This is a compiler crash in the dependency build, not a diagnostic in the new native modules. Investigate a stable Windows ARM64 compiler/toolset or a narrowly scoped OCCT workaround separately.
+- Flatpak x86_64 and aarch64 both reached the Flatpak dependency build and then failed while `orca_deps` returned exit code 2; `xvfb-run` is only the wrapper reporting that child failure. Both logs show a Python NumPy import warning during OpenCV CMake configuration, but the available log excerpt does not yet prove that warning is the final cause. Do not change the Flatpak environment until the failing dependency target is identified.
+- The Linux ARM64 AppStream metadata message is a packaging warning and is separate from the failed Flatpak jobs.
+
+The full Build all run #32 for the current head was pending at the time of this checkpoint. Do not merge until a complete Windows x64 build and the remaining functional validations pass.

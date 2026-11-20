@@ -1,6 +1,7 @@
 #include "GLGizmoPaintedConnector.hpp"
 
 #include "libslic3r/Model.hpp"
+#include "libslic3r/Point.hpp"
 #include <array>
 #include "libslic3r/Print.hpp"
 
@@ -17,6 +18,8 @@
 
 #include <array>
 #include <cassert>
+#include <cstddef>
+#include <iterator>
 #include <glad/gl.h>
 #include <algorithm>
 #include <string>

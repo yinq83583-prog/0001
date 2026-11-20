@@ -1,5 +1,6 @@
 #include "PaintedSurfaceConnector.hpp"
 #include <algorithm>
+#include <cstddef>
 #include <cmath>
 #include <cstdint>
 #include <map>
@@ -7,6 +8,7 @@
 #include <set>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 namespace Slic3r::Connector {
 namespace {

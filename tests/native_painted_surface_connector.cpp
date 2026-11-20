@@ -2,9 +2,29 @@
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <map>
+#include <tuple>
+#include <algorithm>
 using namespace Slic3r::Connector;
 
 static bool close(double a,double b) { return std::abs(a-b)<1e-8; }
+static bool is_closed_manifold(const std::vector<Triangle>& triangles) {
+    using Vertex = std::tuple<long long,long long,long long>;
+    using Edge = std::pair<Vertex,Vertex>;
+    auto key=[](Vec3 p) -> Vertex {
+        return {std::llround(p.x*100000),std::llround(p.y*100000),std::llround(p.z*100000)};
+    };
+    std::map<Edge,int> counts;
+    for(const Triangle& t:triangles) {
+        Vertex a=key(t.a),b=key(t.b),c=key(t.c);
+        for(Edge e:{Edge{a,b},Edge{b,c},Edge{c,a}}) {
+            if(e.second<e.first)std::swap(e.first,e.second);
+            ++counts[e];
+        }
+    }
+    return !counts.empty()&&std::all_of(counts.begin(),counts.end(),
+        [](const auto& edge_count){return edge_count.second==2;});
+}
 int main() {
     std::vector<Triangle> patch={
         {{0,0,5},{10,0,5},{10,10,5}},
@@ -40,6 +60,7 @@ int main() {
     assert(connected.bridges==1);
     assert(connected.downward_connectors==0);
     assert(connected.triangles.size()==8); // 6 side + 2 conformal caps
+    assert(is_closed_manifold(connected.triangles));
 
     // Different boundary triangulations are resampled to a common loop.
     const std::vector<Triangle> mismatched_loops={
@@ -54,6 +75,7 @@ int main() {
     assert(resampled_bridge.bridges==1);
     assert(resampled_bridge.downward_connectors==0);
     assert(resampled_bridge.triangles.size()==14); // 9 zipper sides + 5 original cap faces
+    assert(is_closed_manifold(resampled_bridge.triangles));
 
     // Distant painted islands are not accidentally joined.
     const std::vector<Triangle> distant={

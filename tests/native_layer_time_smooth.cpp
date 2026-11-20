@@ -65,5 +65,32 @@ int main() {
     const auto profile_before=profile_disabled;
     assert(!LayerTimeSmooth::process(profile_disabled,c,&report));
     assert(profile_disabled==profile_before);
+    // A zero smoothing strength disables changes without overriding the
+    // independently configurable adjacent-layer variation target.
+    LayerTimeSmoothConfig no_strength;
+    no_strength.quality_speed = 0.0;
+    no_strength.max_layer_variation_percent = 10.0;
+    no_strength.min_speed_mm_s = 1.0;
+    no_strength.max_slowdown_percent = 60.0;
+    no_strength.max_total_time_increase_percent = 50.0;
+    no_strength.smooth_radius = 1;
+    auto no_strength_gcode = sample();
+    const auto no_strength_before = no_strength_gcode;
+    assert(!LayerTimeSmooth::process(no_strength_gcode, no_strength, &report));
+    assert(no_strength_gcode == no_strength_before);
+
+    LayerTimeSmoothConfig strict_target = no_strength;
+    strict_target.quality_speed = 1.0;
+    strict_target.max_layer_variation_percent = 10.0;
+    auto strict_gcode = sample();
+    LayerTimeSmoothReport strict_report;
+    assert(LayerTimeSmooth::process(strict_gcode, strict_target, &strict_report));
+
+    LayerTimeSmoothConfig relaxed_target = strict_target;
+    relaxed_target.max_layer_variation_percent = 80.0;
+    auto relaxed_gcode = sample();
+    LayerTimeSmoothReport relaxed_report;
+    assert(LayerTimeSmooth::process(relaxed_gcode, relaxed_target, &relaxed_report));
+    assert(strict_report.max_jump_after <= relaxed_report.max_jump_after + 1e-6);
     std::cout<<"Layer Time Smooth native unit tests passed\n";
 }

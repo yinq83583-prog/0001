@@ -96,3 +96,13 @@ Reviewed Build all run #26 and validation runs for head `3790bcde4b9af0f9c062bce
 - The Linux ARM64 AppStream metadata message is a packaging warning and is separate from the failed Flatpak jobs.
 
 The full Build all run #32 for the current head was pending at the time of this checkpoint. Do not merge until a complete Windows x64 build and the remaining functional validations pass.
+
+## Flatpak dependency root-cause fix — 2026-11-20
+
+The Flatpak x86_64 and aarch64 logs were traced to the same confirmed dependency failure, not to `xvfb-run` or the new native modules:
+
+`dep_Boost` (Boost 1.84.0) fails during CMake configuration at `libs/locale/CMakeLists.txt:231`. Its `source_group(TREE ... include/boost/locale ...)` receives `include/boost/locale.hpp`, which is a sibling of the `include/boost/locale/` directory rather than a child. Newer CMake versions reject that path with “is not a prefix of file”. OpenCV completes successfully; the earlier missing-NumPy probe is a non-fatal configure warning and is not the cause.
+
+A narrow Boost patch now removes only `include/boost/locale.hpp` from the TREE source list. The existing explicit `source_group("headers" FILES "include/boost/locale.hpp")` continues to group that header separately. The patch is applied only to the Boost 1.84.0 dependency source during its ExternalProject patch step.
+
+The Windows ARM64 failure remains separate: MSVC 14.52 crashes internally (C1001) while compiling third-party OCCT `BRepGraph_LayerTopoSupplement.cxx`. The current Windows x64 build remains the release target and must pass independently.

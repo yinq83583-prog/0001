@@ -383,15 +383,22 @@ TEST_CASE("Seam metadata restores only recognized modes on compatible base types
     }
 }
 
-TEST_CASE("Painted Surface Connector annotations survive a 3MF round trip", "[PaintedSurfaceConnector3mf]")
+TEST_CASE("Painted Surface Connector annotations survive BBS and Prusa 3MF round trips", "[PaintedSurfaceConnector3mf]")
 {
     const auto backend = GENERATE(Backend::Bbs, Backend::Prusa);
-    CAPTURE(int(backend));
+    const bool shared = GENERATE(false, true);
+    CAPTURE(int(backend), shared);
     Scene source;
-    source.populate(false);
-    ModelVolume &painted = *source.model.objects.front()->volumes.front();
-    painted.connector_facets.set_triangle_from_string(0, "1");
-    REQUIRE(painted.connector_facets.get_triangle_as_string(0) == "1");
+    source.populate(true, shared);
+    REQUIRE(source.model.objects.size() == 1);
+    ModelObject &object = *source.model.objects.front();
+    REQUIRE(object.volumes.size() == 7);
+
+    // Three helper volumes share the same mesh when requested. Different paint masks
+    // must force distinct BBS mesh resources; an identical mask may still share safely.
+    object.volumes[1]->connector_facets.set_triangle_from_string(0, "1");
+    object.volumes[2]->connector_facets.set_triangle_from_string(1, "1");
+    object.volumes[3]->connector_facets.set_triangle_from_string(0, "1");
     REQUIRE(source.model.is_connector_painted());
 
     ScopedTemporaryFile file(".3mf");
@@ -400,14 +407,23 @@ TEST_CASE("Painted Surface Connector annotations survive a 3MF round trip", "[Pa
     const auto model_file = std::find_if(archive.begin(), archive.end(),
         [](const auto &entry) { return entry.first == "3D/3dmodel.model"; });
     REQUIRE(model_file != archive.end());
-    CHECK(model_file->second.find("slic3rpe:connector_painting=\"1\"") != std::string::npos);
-    CHECK(model_file->second.find("name=\"slic3rpe:ConnectorPaintingVersion\">1</") != std::string::npos);
+    const std::string connector_attribute = backend == Backend::Bbs ?
+        "paint_connector=\"1\"" : "slic3rpe:connector_painting=\"1\"";
+    CHECK(model_file->second.find(connector_attribute) != std::string::npos);
+    if (backend == Backend::Prusa)
+        CHECK(model_file->second.find("name=\"slic3rpe:ConnectorPaintingVersion\">1</") != std::string::npos);
 
     Scene destination;
     load(file.string(), backend, destination);
     REQUIRE(destination.model.objects.size() == 1);
-    REQUIRE(destination.model.objects.front()->volumes.size() == 2);
-    const ModelVolume &restored = *destination.model.objects.front()->volumes.front();
-    CHECK(restored.connector_facets.get_triangle_as_string(0) == "1");
+    REQUIRE(destination.model.objects.front()->volumes.size() == 7);
+    const auto &restored = destination.model.objects.front()->volumes;
+    CHECK(restored[1]->connector_facets.get_triangle_as_string(0) == "1");
+    CHECK(restored[1]->connector_facets.get_triangle_as_string(1).empty());
+    CHECK(restored[2]->connector_facets.get_triangle_as_string(0).empty());
+    CHECK(restored[2]->connector_facets.get_triangle_as_string(1) == "1");
+    CHECK(restored[3]->connector_facets.get_triangle_as_string(0) == "1");
+    for (size_t i = 4; i < restored.size(); ++i)
+        CHECK(restored[i]->connector_facets.get_triangle_as_string(0).empty());
     CHECK(destination.model.is_connector_painted());
 }

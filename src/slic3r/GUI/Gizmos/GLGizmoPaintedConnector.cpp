@@ -478,6 +478,9 @@ void GLGizmoPaintedConnector::generate_connectors()
     if (it != objects.end())
         wxGetApp().obj_list()->update_info_items(std::distance(objects.begin(), it));
 
+    // Refresh the ModelVolume list and Prepare viewport immediately after
+    // adding the independent printable connector part.
+    wxGetApp().plater()->update();
     m_parent.post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
     m_parent.set_as_dirty();
 }

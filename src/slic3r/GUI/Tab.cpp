@@ -3304,6 +3304,7 @@ void TabPrint::build()
         // because these are print-process options, not filament cooling controls.
         optgroup = page->new_optgroup(L("Layer time smoothing"), L"param_speed");
         optgroup->append_single_option_line("layer_time_smooth");
+        optgroup->append_single_option_line("layer_time_smooth_max_variation");
         optgroup->append_single_option_line("layer_time_smooth_max_slowdown");
         optgroup->append_single_option_line("layer_time_smooth_min_speed");
         optgroup->append_single_option_line("layer_time_smooth_max_time_increase");

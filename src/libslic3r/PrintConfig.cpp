@@ -6826,14 +6826,6 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
 
-    def = this->add("layer_time_smooth_max_variation", coFloat);
-    def->label = L("Maximum adjacent layer time change");
-    def->category = L("Cooling");
-    def->tooltip = L("Maximum allowed print-time difference between adjacent layers before smoothing is applied.");
-    def->sidetext = L("%");
-    def->min = 0; def->max = 100; def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(25.0));
-
     def = this->add("layer_time_smooth_max_slowdown", coFloat);
     def->label = L("Maximum slowdown");
     def->category = L("Cooling");

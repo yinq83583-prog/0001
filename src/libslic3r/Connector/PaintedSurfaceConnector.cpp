@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdint>
 #include <map>
+#include <limits>
 #include <set>
 #include <tuple>
 #include <utility>
@@ -96,10 +97,139 @@ ConnectorResult generate_downward_connectors(const std::vector<Triangle>& painte
             if(duplicate.count(item.first))continue;
             Vec3 a=add(item.second.first,offset),b=add(item.second.second,offset);
             Vec3 c=b,d=a;c.z=options.bed_z_mm;d.z=options.bed_z_mm;
-            add_quad(result.triangles,a,b,c,d);
+            add_quad(result.triangles,b,a,d,c);
         }
         ++result.downward_connectors;
     }
     return result;
 }
+
+namespace {
+using BoundarySegments=std::map<Edge,std::pair<Vec3,Vec3>>;
+bool get_boundary(const Region& region,std::vector<Vec3>& loop) {
+    BoundarySegments edges;
+    std::set<Edge> interior;
+    for(const auto& t:region.facets)
+        for(auto [a,b]:{std::pair<Vec3,Vec3>{t.a,t.b},{t.b,t.c},{t.c,t.a}}) {
+            Edge e=edge(a,b);
+            if(edges.count(e))interior.insert(e);
+            else edges.emplace(e,std::make_pair(a,b));
+        }
+    std::map<Key,Vec3> from,to;
+    for(const auto& e:edges){
+        if(interior.count(e.first))continue;
+        auto ka=key(e.second.first),kb=key(e.second.second);
+        if(from.count(ka)||to.count(kb))return false;
+        from.emplace(ka,e.second.second);
+        to.emplace(kb,e.second.first);
+    }
+    if(from.size()<3)return false;
+    Key start=from.begin()->first,curr=start;
+    for(std::size_t i=0;i<from.size();++i) {
+        if(!from.count(curr))return false;
+        auto it=edges.find(Edge{});(void)it;
+        // Reverse-lookup the real vertex from a boundary edge.
+        Vec3 point;
+        bool found=false;
+        for(const auto& p:edges)if(!interior.count(p.first)&&key(p.second.first)==curr){
+            point=p.second.first;found=true;break;
+        }
+        if(!found)return false;
+        loop.push_back(point);
+        curr=key(from.at(curr));
+        if(curr==start)return loop.size()==from.size();
+    }
+    return false;
+}
+void append_cap(std::vector<Triangle>& dst,const Region& region,Vec3 offset) {
+    // The painted source normals point into the gap, hence reverse
+    // them when using those patches as the outer caps of the connector.
+    for(const Triangle& tri:region.facets)
+        dst.push_back({add(tri.a,offset),add(tri.c,offset),add(tri.b,offset)});
+}
+bool bridge_regions(const Region& a,const Region& b,double gap,std::vector<Triangle>& out) {
+    std::vector<Vec3> aa,bb;
+    if(!get_boundary(a,aa)||!get_boundary(b,bb)||aa.size()!=bb.size())return false;
+    if(aa.size()>4096)return false;
+    const Vec3 oa=mul(a.normal,gap),ob=mul(b.normal,gap);
+    for(auto& v:aa)v=add(v,oa);
+    for(auto& v:bb)v=add(v,ob);
+    double best=std::numeric_limits<double>::infinity();
+    std::size_t shift=0;bool reverse=false;
+    // Choose nearest cyclic correspondence; allow opposite winding.
+    for(int dir=0;dir<2;++dir)
+        for(std::size_t offset=0;offset<bb.size();++offset){
+            double score=0;
+            for(std::size_t i=0;i<aa.size();++i){
+                auto j=dir==0?(i+offset)%bb.size():(offset+bb.size()-i)%bb.size();
+                const Vec3 d=sub(aa[i],bb[j]);score+=dot(d,d);
+            }
+            if(score<best){best=score;shift=offset;reverse=dir!=0;}
+        }
+    std::vector<Vec3> matched(bb.size());
+    for(std::size_t i=0;i<bb.size();++i){
+        auto j=reverse?(shift+bb.size()-i)%bb.size():(i+shift)%bb.size();
+        matched[i]=bb[j];
+    }
+    // Keep faces consistently outward using a radial normal relative to
+    // the bridge axis rather than relying on two source windings agreeing.
+    const Vec3 axis=unit(sub(b.center,a.center));
+    for(std::size_t i=0;i<aa.size();++i){
+        std::size_t j=(i+1)%aa.size();
+        const Vec3 mid=mul(add(add(aa[i],aa[j]),add(matched[i],matched[j])),.25);
+        const Vec3 midcenter=mul(add(a.center,b.center),.5);
+        const Vec3 rel=sub(mid,midcenter);
+        const Vec3 radial=sub(rel,mul(axis,dot(rel,axis)));
+        Triangle first{aa[i],aa[j],matched[j]};
+        if(dot(cross(sub(first.b,first.a),sub(first.c,first.a)),radial)<0)
+            std::swap(first.b,first.c);
+        Triangle second{aa[i],matched[j],matched[i]};
+        if(dot(cross(sub(second.b,second.a),sub(second.c,second.a)),radial)<0)
+            std::swap(second.b,second.c);
+        out.push_back(first);out.push_back(second);
+    }
+    append_cap(out,a,oa);
+    append_cap(out,b,ob);
+    return true;
+}
+}
+ConnectorResult generate_connectors(const std::vector<Triangle>& painted,
+    const ConnectorOptions& options) {
+    auto regions=connected_painted_regions(painted);
+    ConnectorResult result;
+    result.regions=regions.size();
+    std::vector<bool> paired(regions.size(),false);
+    struct Pair {double distance;std::size_t a,b;};
+    std::vector<Pair> candidates;
+    for(std::size_t i=0;i<regions.size();++i)
+        for(std::size_t j=i+1;j<regions.size();++j){
+            Vec3 delta=sub(regions[j].center,regions[i].center);
+            const double distance=len(delta);
+            if(distance<=2*options.fit_gap_mm+.01)continue;
+            const Vec3 direction=unit(delta);
+            if(dot(regions[i].normal,direction)>.45&&
+               dot(regions[j].normal,mul(direction,-1))>.45)
+                candidates.push_back({distance,i,j});
+        }
+    std::sort(candidates.begin(),candidates.end(),[](const Pair& a,const Pair& b){
+        return a.distance<b.distance;
+    });
+    for(const Pair& p:candidates) {
+        if(paired[p.a]||paired[p.b])continue;
+        std::vector<Triangle> bridge;
+        if(!bridge_regions(regions[p.a],regions[p.b],
+            std::max(0.0,options.fit_gap_mm),bridge))continue;
+        result.triangles.insert(result.triangles.end(),bridge.begin(),bridge.end());
+        paired[p.a]=paired[p.b]=true;
+        ++result.bridges;
+    }
+    for(std::size_t i=0;i<regions.size();++i)if(!paired[i]) {
+        const auto down=generate_downward_connectors(regions[i].facets,options);
+        result.triangles.insert(result.triangles.end(),down.triangles.begin(),down.triangles.end());
+        result.downward_connectors+=down.downward_connectors;
+        result.skipped_regions+=down.skipped_regions;
+    }
+    return result;
+}
+
 } // namespace Slic3r::Connector

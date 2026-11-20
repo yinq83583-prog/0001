@@ -13898,22 +13898,38 @@ static Points to_points(const std::vector<Vec2d> &dpts)
     return pts;
 }
 
-Polygon get_shared_poly(const std::vector<Pointfs>& extruder_polys)
+Polygon get_shared_poly(const std::vector<Pointfs>& extruder_polys, const Pointfs& fallback_area)
 {
+    const auto fallback_to_bed = [&]() {
+        Polygon fallback_poly;
+        fallback_poly.points = to_points(make_counter_clockwise(fallback_area));
+        return fallback_poly;
+    };
+
     Polygon result;
-    for (int index = 0; index < extruder_polys.size(); index++)
-    {
-        const Pointfs& extruder_area = extruder_polys[index];
-        if (index == 0)
-            result.points = to_points(extruder_area);
-        else {
-            Polygon extruer_poly;
-            extruer_poly.points = to_points(extruder_area);
-            Polygons result_polygon = intersection(extruer_poly, result);
-            result = result_polygon[0];
+    bool has_result = false;
+    for (const Pointfs& extruder_area : extruder_polys) {
+        Polygon extruder_poly;
+        extruder_poly.points = to_points(extruder_area);
+        if (extruder_poly.points.size() < 3)
+            return fallback_to_bed();
+
+        if (!has_result) {
+            result = std::move(extruder_poly);
+            has_result = true;
+            continue;
         }
+
+        // Two extruder beds may only touch at an edge, producing no polygon.
+        // Do not index an empty intersection result; use the configured bed as a safe fallback.
+        Polygons result_polygon = intersection(extruder_poly, result);
+        if (result_polygon.empty() || result_polygon.front().points.size() < 3)
+            return fallback_to_bed();
+
+        result = std::move(result_polygon.front());
     }
-    return result;
+
+    return has_result && result.points.size() >= 3 ? result : fallback_to_bed();
 }
 Points get_bed_shape(const DynamicPrintConfig &config, bool use_share)
 {
@@ -13933,7 +13949,7 @@ Points get_bed_shape(const DynamicPrintConfig &config, bool use_share)
         const ConfigOptionPointsGroups *extruder_area_opt = config.opt<ConfigOptionPointsGroups>("extruder_printable_area");
         if (extruder_area_opt && (extruder_area_opt->size() > 0)) {
             const std::vector<Pointfs>& extruder_areas = extruder_area_opt->values;
-            bed_poly = get_shared_poly(extruder_areas);
+            bed_poly = get_shared_poly(extruder_areas, bed_shape_opt->values);
         }
         else
             bed_poly.points = to_points(make_counter_clockwise(bed_shape_opt->values));
@@ -13950,7 +13966,7 @@ Points get_bed_shape(const PrintConfig &cfg, bool use_share)
     if (use_share) {
         const std::vector<Pointfs>& extruder_areas = cfg.extruder_printable_area.values;
         if (extruder_areas.size() > 0) {
-            bed_poly = get_shared_poly(extruder_areas);
+            bed_poly = get_shared_poly(extruder_areas, cfg.printable_area.values);
         }
         else
             bed_poly.points = to_points(make_counter_clockwise(cfg.printable_area.values));

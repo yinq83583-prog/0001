@@ -28,8 +28,13 @@ public:
     std::size_t find(std::size_t i){while(parent[i]!=i){parent[i]=parent[parent[i]];i=parent[i];}return i;}
     void join(std::size_t a,std::size_t b){a=find(a);b=find(b);if(a!=b)parent[b]=a;}
 };
+void add_triangle_if_valid(std::vector<Triangle>& tris,Vec3 a,Vec3 b,Vec3 c){
+    if(len(cross(sub(b,a),sub(c,a)))>1e-12)
+        tris.push_back({a,b,c});
+}
 void add_quad(std::vector<Triangle>& tris,Vec3 a,Vec3 b,Vec3 c,Vec3 d){
-    tris.push_back({a,b,c});tris.push_back({a,c,d});
+    add_triangle_if_valid(tris,a,b,c);
+    add_triangle_if_valid(tris,a,c,d);
 }
 }
 std::vector<Region> connected_painted_regions(const std::vector<Triangle>& painted) {
@@ -85,7 +90,7 @@ ConnectorResult generate_downward_connectors(const std::vector<Triangle>& painte
         // Conformal cap: preserve the actual painted triangles and their winding.
         for(const Triangle& t:r.facets){
             const Triangle top{add(t.a,offset),add(t.b,offset),add(t.c,offset)};
-            result.triangles.push_back(top);
+            add_triangle_if_valid(result.triangles,top.a,top.b,top.c);
             Triangle bottom=top;
             bottom.a.z=options.bed_z_mm;bottom.b.z=options.bed_z_mm;bottom.c.z=options.bed_z_mm;
             std::swap(bottom.b,bottom.c);

@@ -462,6 +462,14 @@ void GLGizmoPaintedConnector::generate_connectors()
         connector_its.indices.emplace_back(first, first + 1, first + 2);
     }
 
+    // TriangleMesh expects a shared indexed topology. The geometry core
+    // emits independent triangles, so weld identical vertices and discard
+    // any degenerate faces before constructing the printable volume.
+    its_merge_vertices(connector_its);
+    its_remove_degenerate_faces(connector_its);
+    if (connector_its.indices.empty())
+        return;
+
     TriangleMesh connector_mesh(std::move(connector_its));
     if (connector_mesh.empty())
         return;

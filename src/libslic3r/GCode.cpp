@@ -3006,7 +3006,11 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
             if (!output)
                 throw Slic3r::RuntimeError("Layer Time Smooth failed while writing the temporary G-code file.");
 
-            DoExport::init_gcode_processor(print->config(), m_processor, print->get_layered_nozzle_group_result());
+            m_processor.reset();
+            m_processor.initialize_from_context(print->get_layered_nozzle_group_result());
+            m_processor.initialize_result_moves();
+            m_processor.apply_config(print->config());
+            m_processor.configure_exclusion_volume_path_check(print->config());
             m_processor.set_print(print);
             set_mass_locator(m_processor, *print);
             m_processor.initialize(path_tmp);

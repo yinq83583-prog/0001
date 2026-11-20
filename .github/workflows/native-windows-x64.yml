@@ -1,9 +1,9 @@
 name: Native Windows x64 build
 
+# Build all already compiles the complete Windows x64 target for every PR head.
+# Keep this focused variant manual so it does not duplicate that long dependency build.
 on:
-  push:
-    branches:
-      - feature/painted-surface-layer-time-smooth-v250
+  workflow_dispatch:
 
 concurrency:
   group: native-windows-x64-${{ github.ref }}

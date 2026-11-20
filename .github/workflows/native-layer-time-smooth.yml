@@ -1,10 +1,15 @@
 name: Native connector and layer time smooth tests
 on:
-  push:
-    branches:
-      - feature/painted-surface-layer-time-smooth-v250
   pull_request:
+    branches:
+      - main
+      - release/*
   workflow_dispatch:
+
+# Avoid duplicate push + pull_request runs for the same PR head.
+concurrency:
+  group: native-core-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   native-core:

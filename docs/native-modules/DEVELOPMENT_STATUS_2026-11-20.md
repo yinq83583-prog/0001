@@ -65,3 +65,14 @@ The previous Clang-Tidy run failed at `Restore the newest cached deps` because n
 4. Re-run Clang-Tidy after a matching Linux dependency cache is available.
 5. Inspect actual Windows x64 source compilation diagnostics, then fix only concrete compiler/test failures.
 6. Keep PR #2 draft and do not merge until full build, 3MF persistence, undo/redo, geometry manifoldness, and real G-code validation pass.
+
+## Further CI fixes — 2026-11-20
+
+The follow-up review identified additional causes of unnecessary CI churn and fixed them together:
+
+- **Clang-Tidy cache wait:** the workflow previously marked a PR as changing dependencies only when `deps/` changed, while `ci_deps_cache.sh` also fingerprints `.github/`. Because this PR changes workflow files, Clang-Tidy incorrectly looked for a base-branch cache instead of waiting for this PR's own Build all dependency job. It then failed at cache restore before running C++ analysis. The changed-file check now treats either `deps/` or `.github/` changes as requiring the PR's own cache, and Clang-Tidy no longer cancels its active run on each new commit.
+- **Profile-check queue:** added a per-PR concurrency group that lets the active check finish and retains only the newest pending run. The legacy-tag fetch now targets upstream and captures fetch/archive/check output in one log.
+- **Duplicate native tests:** the native module test workflow now runs on pull requests and manual dispatch, not both push and pull_request for the same PR commit. It also uses a per-PR concurrency group.
+- **Duplicate Windows build:** the focused Windows x64 workflow is now manual-only because Build all already performs the full Windows x64 matrix. This prevents future duplicate dependency builds while preserving a manual diagnostic build.
+
+The active full Build all run #26 and the focused Windows x64 run #2 were already in progress before these changes; they were left untouched. The latest full Build all run is expected to wait behind the active per-PR build group and then validate the current PR head. Existing queued runs created before these workflow changes may still complete or be superseded by newer pending runs.

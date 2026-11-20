@@ -31,7 +31,7 @@ env:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   clang_tidy:
@@ -59,7 +59,10 @@ jobs:
           else
             echo "No C++ changes under src/ or tests/."
           fi
-          if ! git diff --quiet HEAD^1 -- deps; then
+          # The cache validity check also fingerprints .github/ workflow files.
+          # When either deps/ or .github/ changes, wait for this PR's own Build all
+          # dependency job rather than looking for a cache on the base branch.
+          if ! git diff --quiet HEAD^1 -- deps .github; then
             echo "deps=true" >> "$GITHUB_OUTPUT"
           fi
           echo "deps-key=linux-clang-cache-orcaslicer_deps-build-${{ hashFiles('deps/**') }}" >> "$GITHUB_OUTPUT"

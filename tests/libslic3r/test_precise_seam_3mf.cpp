@@ -402,7 +402,7 @@ TEST_CASE("Painted Surface Connector annotations survive BBS split-model 3MF rou
     Archive archive = read_archive(file.string());
     CHECK(std::any_of(archive.begin(), archive.end(), [](const auto &entry) {
         return entry.first.find("3D/Objects/") == 0 &&
-               entry.second.find("paint_connector=\\"1\\"") != std::string::npos;
+               entry.second.find("paint_connector=\"1\"") != std::string::npos;
     }));
 
     Scene destination;

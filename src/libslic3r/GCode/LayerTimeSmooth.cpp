@@ -76,7 +76,7 @@ double profile_at(const std::vector<double>& p,double x) {
     return clampv(p[a]*(1-(x-a))+p[b]*(x-a),0,1);
 }
 std::string replace_feed(const std::string& code,double f) {
-    static const std::regex fr(R"((?i)(?<![A-Za-z])F\s*-?(?:\d+(?:\.\d*)?|\.\d+))");
+    static const std::regex fr(R"(\b[Ff]\s*-?(?:\d+(?:\.\d*)?|\.\d+))");
     std::string out=std::regex_replace(code,fr,"");
     while(!out.empty()&&std::isspace(static_cast<unsigned char>(out.back())))out.pop_back();
     std::ostringstream ss;ss<<out<<" F"<<std::fixed;ss.precision(1);ss<<f;return ss.str();
@@ -156,16 +156,39 @@ bool LayerTimeSmooth::process(std::string& gcode,const LayerTimeSmoothConfig& in
         for(int k=0;k<40;++k){double mid=(lo+hi)/2,est=0;for(const auto& m:l.moves)if(m.eligible)est+=m.duration/std::max(mid,m.floor);if(est>desired)lo=mid;else hi=mid;}
         scales[i]=(lo+hi)/2;
     }
-    std::vector<std::string> out=lines;double output_feed=1800;std::size_t changed_count=0,restored=0;
-    // Re-emit only explicit F words on eligible extrusion lines; inject an F restore
-    // on the first following non-eligible move if modal feed would otherwise leak.
-    for(std::size_t li=0;li<layers.size();++li)for(const auto& m:layers[li].moves){
-        const double desired=m.eligible?std::max(m.feed_mm_min*scales[li],m.feed_mm_min*(1-c.max_slowdown_percent/100.0)):m.feed_mm_min;
-        if(std::abs(desired-m.feed_mm_min)>.05){out[m.line]=replace_feed(code_part(lines[m.line]),desired/unit)+comment_part(lines[m.line]);++changed_count;}
-        if(!m.eligible&&std::abs(desired-output_feed)>.05&&code_part(lines[m.line]).find('F')==std::string::npos){
-            out[m.line]=replace_feed(code_part(lines[m.line]),desired/unit)+comment_part(lines[m.line]);++restored;
+    std::vector<std::string> out=lines;
+    std::vector<const Move*> mapped(lines.size(),nullptr);
+    std::vector<double> line_scale(lines.size(),1.0);
+    for(std::size_t li=0;li<layers.size();++li)
+        for(const auto& m:layers[li].moves){mapped[m.line]=&m;line_scale[m.line]=scales[li];}
+
+    // Track the input feed and the emitted modal feed independently.
+    // All G0/G1 lines are handled (including zero-length and F-only commands).
+    double original_modal_feed=1800.0, emitted_modal_feed=1800.0, output_units=1.0;
+    std::size_t changed_count=0,restored=0;
+    for(std::size_t n=0;n<lines.size();++n){
+        const std::string code=code_part(lines[n]);
+        const std::string cmd=command(code);
+        if(cmd=="G20"){output_units=25.4;continue;}
+        if(cmd=="G21"){output_units=1.0;continue;}
+        if(cmd!="G0"&&cmd!="G00"&&cmd!="G1"&&cmd!="G01")continue;
+        const auto w=words(code);
+        if(auto f=w.find('F');f!=w.end())original_modal_feed=f->second*output_units;
+        double desired=original_modal_feed;
+        if(const Move* m=mapped[n];m&&m->eligible){
+            const double minimum=c.keep_min_speed?c.min_speed_mm_s*60.0:60.0;
+            const double floor=std::min(original_modal_feed,
+                std::max(minimum,original_modal_feed*(1.0-c.max_slowdown_percent/100.0)));
+            desired=std::max(original_modal_feed*line_scale[n],floor);
         }
-        output_feed=desired;
+        const bool need_update=std::abs(desired-emitted_modal_feed)>.05;
+        const bool explicit_feed=w.count('F')!=0;
+        if(need_update||explicit_feed){
+            out[n]=replace_feed(code,desired/output_units)+comment_part(lines[n]);
+            if(desired<original_modal_feed-.05)++changed_count;
+            else if(need_update&&!explicit_feed)++restored;
+            emitted_modal_feed=desired;
+        }
     }
     if(changed_count==0)return finish(LayerTimeSmoothReport::Status::NoChange,"No eligible extrusion moves could be safely adjusted.");
     std::ostringstream result;for(const auto& s:out)result<<s<<'\n';

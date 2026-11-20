@@ -144,6 +144,7 @@ static constexpr const char* CUSTOM_SEAM_ATTR = "slic3rpe:custom_seam";
 static constexpr const char* MMU_SEGMENTATION_ATTR = "slic3rpe:mmu_segmentation";
 static constexpr const char* FUZZY_SKIN_ATTR = "slic3rpe:fuzzy_skin";
 static constexpr const char* CONNECTOR_PAINTING_ATTR = "slic3rpe:connector_painting";
+static constexpr const char* BBS_CONNECTOR_PAINTING_ATTR = "paint_connector";
 
 static constexpr const char* KEY_ATTR = "key";
 static constexpr const char* VALUE_ATTR = "value";
@@ -1800,7 +1801,10 @@ ModelVolumeType type_from_string(const std::string &s)
         m_curr_object.geometry.custom_seam.push_back(get_attribute_value_string(attributes, num_attributes, CUSTOM_SEAM_ATTR));
         m_curr_object.geometry.fuzzy_skin.push_back(get_attribute_value_string(attributes, num_attributes, FUZZY_SKIN_ATTR));
         m_curr_object.geometry.mmu_segmentation.push_back(get_attribute_value_string(attributes, num_attributes, MMU_SEGMENTATION_ATTR));
-        m_curr_object.geometry.connector_painting.push_back(get_attribute_value_string(attributes, num_attributes, CONNECTOR_PAINTING_ATTR));
+        std::string connector_painting = get_attribute_value_string(attributes, num_attributes, CONNECTOR_PAINTING_ATTR);
+        if (connector_painting.empty())
+            connector_painting = get_attribute_value_string(attributes, num_attributes, BBS_CONNECTOR_PAINTING_ATTR);
+        m_curr_object.geometry.connector_painting.push_back(std::move(connector_painting));
         return true;
     }
 

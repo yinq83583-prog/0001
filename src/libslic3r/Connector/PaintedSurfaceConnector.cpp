@@ -80,7 +80,7 @@ ConnectorResult generate_downward_connectors(const std::vector<Triangle>& painte
         std::map<Edge,std::pair<Vec3,Vec3>> borders;
         std::set<Edge> duplicate;
         for(const Triangle& t:r.facets){
-            for(auto [a,b]:{std::pair<Vec3,Vec3>{t.a,t.b},{t.b,t.c},{t.c,t.a}}){
+            for(const auto& [a,b]:{std::pair<Vec3,Vec3>{t.a,t.b},{t.b,t.c},{t.c,t.a}}){
                 const Edge e=edge(a,b);
                 if(borders.count(e))duplicate.insert(e);
                 else borders.emplace(e,std::make_pair(a,b));
@@ -115,7 +115,7 @@ bool get_boundary(const Region& region,std::vector<Vec3>& loop) {
     BoundarySegments edges;
     std::set<Edge> interior;
     for(const auto& t:region.facets)
-        for(auto [a,b]:{std::pair<Vec3,Vec3>{t.a,t.b},{t.b,t.c},{t.c,t.a}}) {
+        for(const auto& [a,b]:{std::pair<Vec3,Vec3>{t.a,t.b},{t.b,t.c},{t.c,t.a}}) {
             Edge e=edge(a,b);
             if(edges.count(e))interior.insert(e);
             else edges.emplace(e,std::make_pair(a,b));

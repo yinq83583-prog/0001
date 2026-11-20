@@ -31,5 +31,24 @@ int main() {
     assert(connected_painted_regions(separate).size()==2);
     assert(generate_downward_connectors(separate).downward_connectors==2);
     assert(generate_downward_connectors({}).triangles.empty());
+    const std::vector<Triangle> facing={
+        {{0,0,3},{10,0,3},{0,10,3}},
+        {{0,0,8},{0,10,8},{10,0,8}}
+    };
+    auto connected=generate_connectors(facing);
+    assert(connected.regions==2);
+    assert(connected.bridges==1);
+    assert(connected.downward_connectors==0);
+    assert(connected.triangles.size()==8); // 6 side + 2 conformal caps
+
+    // Same-facing patches must never create a bridge.
+    const std::vector<Triangle> same_facing={
+        {{0,0,3},{10,0,3},{0,10,3}},
+        {{0,0,8},{10,0,8},{0,10,8}}
+    };
+    auto downward=generate_connectors(same_facing);
+    assert(downward.regions==2);
+    assert(downward.bridges==0);
+    assert(downward.downward_connectors==2);
     std::cout<<"Painted Surface Connector native geometry tests passed\n";
 }

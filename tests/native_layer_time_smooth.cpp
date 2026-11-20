@@ -4,9 +4,9 @@
 #include <iostream>
 #include <string>
 
-using Slic3r::GCode::LayerTimeSmooth;
-using Slic3r::GCode::LayerTimeSmoothConfig;
-using Slic3r::GCode::LayerTimeSmoothReport;
+using Slic3r::GCodeSmoothing::LayerTimeSmooth;
+using Slic3r::GCodeSmoothing::LayerTimeSmoothConfig;
+using Slic3r::GCodeSmoothing::LayerTimeSmoothReport;
 
 static std::string sample() {
     return "G21\nG90\nM83\nG92 X0 Y0 Z0 E0\n"

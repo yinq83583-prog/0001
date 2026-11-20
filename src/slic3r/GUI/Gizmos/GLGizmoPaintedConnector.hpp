@@ -7,6 +7,7 @@
 #include "slic3r/GUI/Gizmos/GLGizmoBase.hpp"
 #include <string>
 #include <wx/string.h>
+#include "libslic3r/Model.hpp"
 #include "libslic3r/TriangleSelector.hpp"
 #include <map>
 #include <vector>

@@ -2994,6 +2994,8 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
         smooth.adjust_gap_fill = print->config().layer_time_smooth_adjust_gap_fill.value;
         smooth.write_layer_report = print->config().layer_time_smooth_write_layer_report.value;
         smooth.keep_min_speed = print->config().layer_time_smooth_keep_min_speed.value;
+        smooth.manual_profile.assign(print->config().layer_time_smooth_manual_profile.values.begin(),
+                                     print->config().layer_time_smooth_manual_profile.values.end());
         smooth.manual_profile = print->config().layer_time_smooth_manual_profile.values;
 
         GCodeSmoothing::LayerTimeSmoothReport smooth_report;

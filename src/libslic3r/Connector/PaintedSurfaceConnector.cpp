@@ -171,50 +171,76 @@ std::vector<Vec3> resample_loop(const std::vector<Vec3>& loop,std::size_t count)
 bool bridge_regions(const Region& a,const Region& b,double gap,std::vector<Triangle>& out) {
     std::vector<Vec3> aa,bb;
     if(!get_boundary(a,aa)||!get_boundary(b,bb))return false;
-    // Painted patches often come from different triangulations. Resample both
-    // closed boundary loops by perimeter so compatible outlines do not fall
-    // back to vertical columns merely because their vertex counts differ.
-    const std::size_t boundary_count=std::min<std::size_t>(2048,std::max(aa.size(),bb.size()));
-    aa=resample_loop(aa,boundary_count);
-    bb=resample_loop(bb,boundary_count);
-    if(aa.size()<3||bb.size()<3||aa.size()!=bb.size())return false;
+    if(aa.size()>2048||bb.size()>2048)return false;
+
+    // Find the best cyclic start and winding for the second loop. Resampling
+    // is used only to score correspondence; the actual strip retains every
+    // original boundary vertex, so its caps remain watertight.
+    const std::size_t sample_count=std::min<std::size_t>(512,std::max(aa.size(),bb.size()));
+    const std::vector<Vec3> sample_a=resample_loop(aa,sample_count);
+    double best=std::numeric_limits<double>::infinity();
+    std::vector<Vec3> matched_loop;
+    for(int dir=0;dir<2;++dir) {
+        std::vector<Vec3> oriented=bb;
+        if(dir!=0)std::reverse(oriented.begin(),oriented.end());
+        for(std::size_t shift=0;shift<oriented.size();++shift) {
+            std::vector<Vec3> candidate=oriented;
+            std::rotate(candidate.begin(),candidate.begin()+static_cast<std::ptrdiff_t>(shift),candidate.end());
+            const std::vector<Vec3> samples=resample_loop(candidate,sample_count);
+            double score=0.0;
+            for(std::size_t i=0;i<sample_count;++i) {
+                const Vec3 d=sub(sample_a[i],samples[i]);
+                score+=dot(d,d);
+            }
+            if(score<best) {
+                best=score;
+                matched_loop=std::move(candidate);
+            }
+        }
+    }
+    if(matched_loop.size()!=bb.size())return false;
+    bb=std::move(matched_loop);
+
     const Vec3 oa=mul(a.normal,gap),ob=mul(b.normal,gap);
     for(auto& v:aa)v=add(v,oa);
     for(auto& v:bb)v=add(v,ob);
-    double best=std::numeric_limits<double>::infinity();
-    std::size_t shift=0;bool reverse=false;
-    // Choose nearest cyclic correspondence; allow opposite winding.
-    for(int dir=0;dir<2;++dir)
-        for(std::size_t offset=0;offset<bb.size();++offset){
-            double score=0;
-            for(std::size_t i=0;i<aa.size();++i){
-                auto j=dir==0?(i+offset)%bb.size():(offset+bb.size()-i)%bb.size();
-                const Vec3 d=sub(aa[i],bb[j]);score+=dot(d,d);
-            }
-            if(score<best){best=score;shift=offset;reverse=dir!=0;}
-        }
-    std::vector<Vec3> matched(bb.size());
-    for(std::size_t i=0;i<bb.size();++i){
-        auto j=reverse?(shift+bb.size()-i)%bb.size():(i+shift)%bb.size();
-        matched[i]=bb[j];
-    }
-    // Keep faces consistently outward using a radial normal relative to
-    // the bridge axis rather than relying on two source windings agreeing.
+
     const Vec3 axis=unit(sub(b.center,a.center));
-    for(std::size_t i=0;i<aa.size();++i){
-        std::size_t j=(i+1)%aa.size();
-        const Vec3 mid=mul(add(add(aa[i],aa[j]),add(matched[i],matched[j])),.25);
-        const Vec3 midcenter=mul(add(a.center,b.center),.5);
+    const Vec3 midcenter=mul(add(a.center,b.center),.5);
+    auto append_side=[&](Triangle tri) {
+        const Vec3 mid=mul(add(add(tri.a,tri.b),tri.c),1.0/3.0);
         const Vec3 rel=sub(mid,midcenter);
         const Vec3 radial=sub(rel,mul(axis,dot(rel,axis)));
-        Triangle first{aa[i],aa[j],matched[j]};
-        if(dot(cross(sub(first.b,first.a),sub(first.c,first.a)),radial)<0)
-            std::swap(first.b,first.c);
-        Triangle second{aa[i],matched[j],matched[i]};
-        if(dot(cross(sub(second.b,second.a),sub(second.c,second.a)),radial)<0)
-            std::swap(second.b,second.c);
-        out.push_back(first);out.push_back(second);
+        if(dot(cross(sub(tri.b,tri.a),sub(tri.c,tri.a)),radial)<0)
+            std::swap(tri.b,tri.c);
+        add_triangle_if_valid(out,tri.a,tri.b,tri.c);
+    };
+
+    // Zipper triangulation supports different boundary vertex counts without
+    // introducing T-junctions between the generated side walls and end caps.
+    std::size_t i=0,j=0;
+    while(i<aa.size()||j<bb.size()) {
+        const double next_a=i<aa.size()?static_cast<double>(i+1)/aa.size():std::numeric_limits<double>::infinity();
+        const double next_b=j<bb.size()?static_cast<double>(j+1)/bb.size():std::numeric_limits<double>::infinity();
+        const Vec3 a0=aa[i%aa.size()];
+        const Vec3 b0=bb[j%bb.size()];
+        if(std::abs(next_a-next_b)<1e-12) {
+            const Vec3 a1=aa[(i+1)%aa.size()];
+            const Vec3 b1=bb[(j+1)%bb.size()];
+            append_side({a0,a1,b1});
+            append_side({a0,b1,b0});
+            ++i;++j;
+        } else if(next_a<next_b) {
+            const Vec3 a1=aa[(i+1)%aa.size()];
+            append_side({a0,a1,b0});
+            ++i;
+        } else {
+            const Vec3 b1=bb[(j+1)%bb.size()];
+            append_side({a0,b1,b0});
+            ++j;
+        }
     }
+
     append_cap(out,a,oa);
     append_cap(out,b,ob);
     return true;

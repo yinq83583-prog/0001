@@ -50,7 +50,7 @@ void GLGizmoPaintedConnector::on_shutdown()
 
 std::string GLGizmoPaintedConnector::on_get_name() const
 {
-    return _u8L("Paint-on connector paint");
+    return _u8L("Painted Surface Connector");
 }
 
 bool GLGizmoPaintedConnector::on_init()
@@ -362,7 +362,7 @@ void GLGizmoPaintedConnector::update_from_model_object(bool first_update)
         const TriangleMesh* mesh = &mv->mesh();
         m_triangle_selectors.emplace_back(std::make_unique<TriangleSelectorPatch>(*mesh, ebt_colors));
         // Reset of TriangleSelector is done inside TriangleSelectorGUI's constructor, so we don't need it to perform it again in deserialize().
-        // Painted connector paints a single state (FUZZY_SKIN): a higher state in the file is reset to NONE.
+        // Painted Surface Connector stores a single ENFORCER state: a higher state in the file is reset to NONE.
         m_triangle_selectors.back()->deserialize(mv->connector_facets.get_data(), false, EnforcerBlockerType::ENFORCER);
         m_triangle_selectors.back()->request_update_render_data();
     }

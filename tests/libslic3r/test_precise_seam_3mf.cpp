@@ -397,8 +397,11 @@ TEST_CASE("Painted Surface Connector annotations survive a 3MF round trip", "[Pa
     ScopedTemporaryFile file(".3mf");
     save(file.string(), backend, source);
     Archive archive = read_archive(file.string());
-    const auto &xml = model_xml(archive, backend);
-    CHECK(xml.find("slic3rpe:connector_painting=\"1\"") != std::string::npos);
+    const auto model_file = std::find_if(archive.begin(), archive.end(),
+        [](const auto &entry) { return entry.first == "3D/3dmodel.model"; });
+    REQUIRE(model_file != archive.end());
+    CHECK(model_file->second.find("slic3rpe:connector_painting=\"1\"") != std::string::npos);
+    CHECK(model_file->second.find("name=\"slic3rpe:ConnectorPaintingVersion\">1</") != std::string::npos);
 
     Scene destination;
     load(file.string(), backend, destination);

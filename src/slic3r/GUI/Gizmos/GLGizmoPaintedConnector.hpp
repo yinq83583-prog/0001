@@ -44,6 +44,7 @@ private:
 
     void update_model_object() override;
     void update_from_model_object(bool first_update) override;
+    bool is_paintable_volume(const ModelVolume* volume) const override;
     void generate_connectors();
 
     void             on_opening() override {}

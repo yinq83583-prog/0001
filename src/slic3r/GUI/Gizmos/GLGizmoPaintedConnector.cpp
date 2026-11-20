@@ -398,6 +398,11 @@ PainterGizmoType GLGizmoPaintedConnector::get_painter_type() const
     return PainterGizmoType::CONNECTOR;
 }
 
+bool GLGizmoPaintedConnector::is_paintable_volume(const ModelVolume* volume) const
+{
+    return volume != nullptr && volume->is_model_part() && !is_generated_connector_volume(volume);
+}
+
 wxString GLGizmoPaintedConnector::handle_snapshot_action_name(bool shift_down, GLGizmoPainterBase::Button button_down) const
 {
     return shift_down ? _L("Remove connector paint") : _L("Add connector paint");

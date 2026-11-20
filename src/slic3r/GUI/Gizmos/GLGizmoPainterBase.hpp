@@ -240,6 +240,11 @@ protected:
     // model part at a time - the texture-displacement gizmo previews every painted part of a multibody
     // object - and drawing those parts' selectors over it would bury the preview under a flat surface.
     void render_triangles(const Selection& selection, const std::vector<const ModelVolume*>& skip) const;
+    // Keep selector indexing aligned with the model-part volumes this gizmo owns.
+    virtual bool is_paintable_volume(const ModelVolume* volume) const
+    {
+        return volume != nullptr && volume->is_model_part();
+    }
     void render_cursor();
     void render_cursor_circle();
     void render_cursor_sphere(const Transform3d& trafo) const;

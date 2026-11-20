@@ -1,4 +1,4 @@
-name: Native layer time smooth tests
+name: Native connector and layer time smooth tests
 on:
   push:
     branches:
@@ -18,5 +18,13 @@ jobs:
             src/libslic3r/GCode/LayerTimeSmooth.cpp \
             tests/native_layer_time_smooth.cpp \
             -o build-native-tests/layer_time_smooth_test
+      - name: Compile painted connector geometry tests
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -O2 \
+            src/libslic3r/Connector/PaintedSurfaceConnector.cpp \
+            tests/native_painted_surface_connector.cpp \
+            -o build-native-tests/painted_connector_test
       - name: Execute native tests
-        run: build-native-tests/layer_time_smooth_test
+        run: |
+          build-native-tests/layer_time_smooth_test
+          build-native-tests/painted_connector_test

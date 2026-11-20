@@ -32,3 +32,36 @@ Mitigation committed: set `concurrency.cancel-in-progress: false` in `.github/wo
 - Clang-Tidy on a runner with a usable dependencies cache.
 
 Do not merge or use for physical printing until these checks pass. Preserve main and SLA/LCD modules.
+
+## Follow-up investigation and recovery — 2026-11-20
+
+Active development head at this checkpoint: `5db5c291f4ff6a91e1bd95b7de58c83dbfa24be5`.
+
+Additional frozen recovery branch:
+`checkpoint/native-modules-2026-11-20-5db5c29` (points exactly to the active head above; the earlier `52eec1f` checkpoint is retained).
+
+### CI queue diagnosis
+
+- The full `Build all` run #26 for commit `de1575ecf539` was still actively building dependencies when inspected. The Windows x64 dependency build had reached approximately 80% of 125 Assimp compilation tasks in its log at 2026-11-20 03:35:53 UTC; Linux, macOS, and Flatpak jobs were also active. This is long-running dependency compilation, not a C++ source error.
+- The latest full `Build all` run #29 for `5db5c291` was pending behind that active run. The workflow uses the per-PR concurrency group `build-all-pull_request-2` with `cancel-in-progress: false`. GitHub permits one running and one pending run per concurrency group; newer pending runs replace older pending runs, while the active run is allowed to finish. The latest head will therefore build after the active run releases the group.
+- The focused `Native Windows x64 build` run #2 was also still building Windows dependencies; run #5 for the latest head was pending behind it. This focused workflow duplicates part of the full Build all Windows x64 work and should be monitored for redundant runner use.
+- Native module regression tests passed on commit `f0e5dbab832a`; the run for `5db5c291` was queued at the time of inspection.
+
+### Corrected profile-check diagnosis
+
+The previous PR profile check was **not** failing because the legacy printer map was outdated. The log shows:
+`fatal: couldn't find remote ref refs/tags/v2.4.2`.
+The check attempted to fetch the release tag from the fork's `origin`, but that tag is absent in the fork. The tag exists in the canonical `OrcaSlicer/OrcaSlicer` repository. The workflow is now changed to fetch `v2.4.2` from that upstream repository, and the entire fetch/archive/check command is kept in the step log pipeline so future failures show their real cause.
+
+### Clang-Tidy diagnosis
+
+The previous Clang-Tidy run failed at `Restore the newest cached deps` because no compatible dependency cache was available. The configure and clang-tidy execution steps were skipped, so this run produced no C++ diagnostics. Re-run after the active dependency build/cache work completes; do not classify this as a code-clean result or as a C++ defect.
+
+### Next validation sequence
+
+1. Let the already-running full Build all and focused Windows x64 jobs finish without pushing unnecessary commits.
+2. Confirm the latest-head Build all run starts after the active per-PR concurrency slot is released.
+3. Confirm the fixed profile check can fetch upstream `v2.4.2` and run the compatibility-map comparison.
+4. Re-run Clang-Tidy after a matching Linux dependency cache is available.
+5. Inspect actual Windows x64 source compilation diagnostics, then fix only concrete compiler/test failures.
+6. Keep PR #2 draft and do not merge until full build, 3MF persistence, undo/redo, geometry manifoldness, and real G-code validation pass.

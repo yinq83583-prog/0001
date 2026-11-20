@@ -76,3 +76,11 @@ The follow-up review identified additional causes of unnecessary CI churn and fi
 - **Duplicate Windows build:** the focused Windows x64 workflow is now manual-only because Build all already performs the full Windows x64 matrix. This prevents future duplicate dependency builds while preserving a manual diagnostic build.
 
 The active full Build all run #26 and the focused Windows x64 run #2 were already in progress before these changes; they were left untouched. The latest full Build all run is expected to wait behind the active per-PR build group and then validate the current PR head. Existing queued runs created before these workflow changes may still complete or be superseded by newer pending runs.
+
+## Geometry safety validation — 2026-11-20
+
+A code review found that a painted region on a vertical wall can collapse to a zero-area footprint when projected onto the build plate. The previous implementation could emit an open or zero-volume connector shell because it only rejected degenerate individual triangles.
+
+The connector generator now validates every downward connector and bridge as a closed, consistently oriented, non-zero-volume triangle shell before adding it to the model. Downward connectors also reject painted regions that intersect or approach the build plate below the configured minimum height. Unsupported geometry is counted as skipped rather than emitted as a broken printable volume.
+
+Regression coverage added for vertical patches (must skip), sloped patches (must remain watertight), and patches intersecting the bed (must skip). The existing horizontal, facing-bridge, and mismatched-loop tests now check edge pairing, winding consistency, and non-zero signed volume.

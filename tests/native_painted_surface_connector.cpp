@@ -11,19 +11,31 @@ static bool close(double a,double b) { return std::abs(a-b)<1e-8; }
 static bool is_closed_manifold(const std::vector<Triangle>& triangles) {
     using Vertex = std::tuple<long long,long long,long long>;
     using Edge = std::pair<Vertex,Vertex>;
+    struct EdgeUse { int count = 0; int orientation = 0; };
     auto key=[](Vec3 p) -> Vertex {
         return {std::llround(p.x*100000),std::llround(p.y*100000),std::llround(p.z*100000)};
     };
-    std::map<Edge,int> counts;
+    std::map<Edge,EdgeUse> uses;
+    double signed_volume6 = 0.0;
     for(const Triangle& t:triangles) {
         Vertex a=key(t.a),b=key(t.b),c=key(t.c);
-        for(Edge e:{Edge{a,b},Edge{b,c},Edge{c,a}}) {
-            if(e.second<e.first)std::swap(e.first,e.second);
-            ++counts[e];
+        for(const auto& directed:{std::pair<Vertex,Vertex>{a,b},{b,c},{c,a}}) {
+            if(directed.first==directed.second)return false;
+            Edge e=directed.first<directed.second?
+                Edge{directed.first,directed.second}:Edge{directed.second,directed.first};
+            auto& use=uses[e];
+            ++use.count;
+            use.orientation += directed.first<directed.second?1:-1;
         }
+        const Vec3 bc={t.b.y*t.c.z-t.b.z*t.c.y,
+                       t.b.z*t.c.x-t.b.x*t.c.z,
+                       t.b.x*t.c.y-t.b.y*t.c.x};
+        signed_volume6 += t.a.x*bc.x+t.a.y*bc.y+t.a.z*bc.z;
     }
-    return !counts.empty()&&std::all_of(counts.begin(),counts.end(),
-        [](const auto& edge_count){return edge_count.second==2;});
+    return !uses.empty()&&std::abs(signed_volume6)>1e-9&&
+        std::all_of(uses.begin(),uses.end(),[](const auto& item) {
+            return item.second.count==2&&item.second.orientation==0;
+        });
 }
 int main() {
     std::vector<Triangle> patch={
@@ -106,5 +118,35 @@ int main() {
     assert(skipped.downward_connectors==0);
     assert(skipped.skipped_regions==1);
     assert(skipped.triangles.empty());
+    // A vertical painted patch projects to a zero-area footprint on the bed.
+    // It must be skipped rather than emitted as an open, zero-volume shell.
+    const std::vector<Triangle> vertical_patch={
+        {{0,0,5},{10,0,5},{10,0,15}},
+        {{0,0,5},{10,0,15},{0,0,15}}
+    };
+    auto vertical_result=generate_downward_connectors(vertical_patch);
+    assert(vertical_result.regions==1);
+    assert(vertical_result.downward_connectors==0);
+    assert(vertical_result.skipped_regions==1);
+    assert(vertical_result.triangles.empty());
+
+    // A sloped patch with a non-degenerate bed footprint remains a valid solid.
+    const std::vector<Triangle> sloped_patch={
+        {{0,0,5},{10,0,7},{0,10,6}}
+    };
+    auto sloped_result=generate_downward_connectors(sloped_patch);
+    assert(sloped_result.downward_connectors==1);
+    assert(sloped_result.skipped_regions==0);
+    assert(is_closed_manifold(sloped_result.triangles));
+
+    // A patch that intersects the build plate is rejected as a support source.
+    const std::vector<Triangle> bed_intersection={
+        {{0,0,-1},{10,0,5},{0,10,5}}
+    };
+    auto bed_intersection_result=generate_downward_connectors(bed_intersection);
+    assert(bed_intersection_result.downward_connectors==0);
+    assert(bed_intersection_result.skipped_regions==1);
+    assert(bed_intersection_result.triangles.empty());
+
     std::cout<<"Painted Surface Connector native geometry tests passed\n";
 }

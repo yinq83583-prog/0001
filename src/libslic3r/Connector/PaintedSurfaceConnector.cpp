@@ -36,6 +36,41 @@ void add_quad(std::vector<Triangle>& tris,Vec3 a,Vec3 b,Vec3 c,Vec3 d){
     add_triangle_if_valid(tris,a,b,c);
     add_triangle_if_valid(tris,a,c,d);
 }
+// Reject zero-volume, open, or inconsistently wound connector shells before
+// they can be inserted into the printable model.
+bool is_closed_oriented_volume(const std::vector<Triangle>& triangles) {
+    if (triangles.size() < 4)
+        return false;
+    struct EdgeUse {
+        std::size_t count = 0;
+        int orientation = 0;
+    };
+    std::map<Edge, EdgeUse> uses;
+    double signed_volume6 = 0.0;
+    for (const Triangle& triangle : triangles) {
+        if (len(cross(sub(triangle.b, triangle.a), sub(triangle.c, triangle.a))) <= 1e-12)
+            return false;
+        for (const auto& directed : {
+            std::pair<Vec3, Vec3>{triangle.a, triangle.b},
+            {triangle.b, triangle.c},
+            {triangle.c, triangle.a}
+        }) {
+            const Key ka = key(directed.first);
+            const Key kb = key(directed.second);
+            if (ka == kb)
+                return false;
+            const Edge e = ka < kb ? Edge{ka, kb} : Edge{kb, ka};
+            auto& use = uses[e];
+            ++use.count;
+            use.orientation += ka < kb ? 1 : -1;
+        }
+        signed_volume6 += dot(triangle.a, cross(triangle.b, triangle.c));
+    }
+    for (const auto& item : uses)
+        if (item.second.count != 2 || item.second.orientation != 0)
+            return false;
+    return std::abs(signed_volume6) > 1e-9;
+}
 }
 std::vector<Region> connected_painted_regions(const std::vector<Triangle>& painted) {
     if(painted.empty())return {};
@@ -74,7 +109,10 @@ ConnectorResult generate_downward_connectors(const std::vector<Triangle>& painte
     result.regions=regions.size();
     const double gap=std::max(0.0,options.fit_gap_mm);
     for(const Region& r:regions){
-        if(r.center.z<=options.bed_z_mm+std::max(0.0,options.min_height_mm)){
+        double min_z = std::numeric_limits<double>::infinity();
+        for (const Triangle& t : r.facets)
+            min_z = std::min({min_z, t.a.z, t.b.z, t.c.z});
+        if(min_z<=options.bed_z_mm+std::max(0.0,options.min_height_mm)){
             ++result.skipped_regions;continue;
         }
         std::map<Edge,std::pair<Vec3,Vec3>> borders;
@@ -87,23 +125,29 @@ ConnectorResult generate_downward_connectors(const std::vector<Triangle>& painte
             }
         }
         const Vec3 offset=mul(r.normal,gap);
+        std::vector<Triangle> candidate;
         // Conformal cap: preserve the actual painted triangles and their winding.
         for(const Triangle& t:r.facets){
             const Triangle top{add(t.a,offset),add(t.b,offset),add(t.c,offset)};
-            add_triangle_if_valid(result.triangles,top.a,top.b,top.c);
+            add_triangle_if_valid(candidate,top.a,top.b,top.c);
             Triangle bottom=top;
             bottom.a.z=options.bed_z_mm;bottom.b.z=options.bed_z_mm;bottom.c.z=options.bed_z_mm;
             std::swap(bottom.b,bottom.c);
             if(len(cross(sub(bottom.b,bottom.a),sub(bottom.c,bottom.a)))>1e-12)
-                result.triangles.push_back(bottom);
+                candidate.push_back(bottom);
         }
         // Only boundary edges receive walls; shared triangle edges are internal.
         for(const auto& item:borders){
             if(duplicate.count(item.first))continue;
             Vec3 a=add(item.second.first,offset),b=add(item.second.second,offset);
             Vec3 c=b,d=a;c.z=options.bed_z_mm;d.z=options.bed_z_mm;
-            add_quad(result.triangles,b,a,d,c);
+            add_quad(candidate,b,a,d,c);
         }
+        if (!is_closed_oriented_volume(candidate)) {
+            ++result.skipped_regions;
+            continue;
+        }
+        result.triangles.insert(result.triangles.end(), candidate.begin(), candidate.end());
         ++result.downward_connectors;
     }
     return result;
@@ -290,7 +334,8 @@ ConnectorResult generate_connectors(const std::vector<Triangle>& painted,
         if(paired[p.a]||paired[p.b])continue;
         std::vector<Triangle> bridge;
         if(!bridge_regions(regions[p.a],regions[p.b],
-            std::max(0.0,options.fit_gap_mm),bridge))continue;
+            std::max(0.0,options.fit_gap_mm),bridge) ||
+           !is_closed_oriented_volume(bridge))continue;
         result.triangles.insert(result.triangles.end(),bridge.begin(),bridge.end());
         paired[p.a]=paired[p.b]=true;
         ++result.bridges;

@@ -50,6 +50,20 @@ int main() {
     assert(!LayerTimeSmooth::process(no_layers,c,&report));
     assert(no_layers==no_layers_before);
 
+    // Absolute E coordinates are independent per tool. Switching back to T1
+    // must compare against T1's last E value, not the value last used by T0.
+    std::string multi_tool =
+        "G21\nG90\nM82\nG92 X0 Y0 Z0 E0\n"
+        "T0\n;LAYER_CHANGE\n;TYPE:Inner wall\nG1 X60 Y0 E2 F3600\n"
+        "T1\nG92 E0\n;LAYER_CHANGE\n;TYPE:Inner wall\nG1 X1260 Y0 E2 F3600\n"
+        "T0\n;LAYER_CHANGE\n;TYPE:Inner wall\nG1 X1320 Y0 E4 F3600\n"
+        "T1\nG1 X1330 Y0 E3 F3600\n";
+    assert(LayerTimeSmooth::process(multi_tool, c, &report));
+    assert(report.layers == 3);
+    assert(report.changed_moves >= 3);
+    // The T1 move remains an extrusion move after switching back from T0.
+    assert(multi_tool.find("G1 X1330 Y0 E3 F3600") == std::string::npos);
+
     // V5.2.1 also recognizes changing Z-height comments when layer markers are absent.
     std::string z_marked =
         "G21\nG90\nM83\nG92 X0 Y0 Z0 E0\n"

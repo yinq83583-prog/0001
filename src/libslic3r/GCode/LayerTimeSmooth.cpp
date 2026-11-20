@@ -203,7 +203,8 @@ Analysis analyze_gcode(const std::vector<std::string>& lines, const LayerTimeSmo
     double x = std::numeric_limits<double>::quiet_NaN();
     double y = std::numeric_limits<double>::quiet_NaN();
     double z = std::numeric_limits<double>::quiet_NaN();
-    double last_e = std::numeric_limits<double>::quiet_NaN();
+    int active_tool = 0;
+    std::map<int, double> last_e_by_tool;
     bool absolute_xyz = true;
     bool absolute_e = true;
     double units = 1.0;
@@ -218,6 +219,13 @@ Analysis analyze_gcode(const std::vector<std::string>& lines, const LayerTimeSmo
             continue;
         const auto parsed = words(code);
 
+        if (cmd.size() > 1 && cmd.front() == 'T' &&
+            std::all_of(cmd.begin() + 1, cmd.end(),
+                [](unsigned char c) { return std::isdigit(c) != 0; })) {
+            active_tool = std::atoi(cmd.c_str() + 1);
+            continue;
+        }
+
         if (cmd == "G90") { absolute_xyz = true; continue; }
         if (cmd == "G91") { absolute_xyz = false; continue; }
         if (cmd == "M82") { absolute_e = true; continue; }
@@ -228,7 +236,7 @@ Analysis analyze_gcode(const std::vector<std::string>& lines, const LayerTimeSmo
             if (parsed.count('X')) x = parsed.at('X') * units;
             if (parsed.count('Y')) y = parsed.at('Y') * units;
             if (parsed.count('Z')) z = parsed.at('Z') * units;
-            if (parsed.count('E')) last_e = parsed.at('E') * units;
+            if (parsed.count('E')) last_e_by_tool[active_tool] = parsed.at('E') * units;
             continue;
         }
         if (cmd != "G0" && cmd != "G00" && cmd != "G1" && cmd != "G01")
@@ -261,11 +269,15 @@ Analysis analyze_gcode(const std::vector<std::string>& lines, const LayerTimeSmo
         bool extrusion = false;
         if (parsed.count('E')) {
             const double extrusion_value = parsed.at('E') * units;
+            auto last_e = last_e_by_tool.find(active_tool);
             const double delta = absolute_e ?
-                (std::isfinite(last_e) ? extrusion_value - last_e : extrusion_value) :
+                (last_e != last_e_by_tool.end() && std::isfinite(last_e->second) ?
+                    extrusion_value - last_e->second : extrusion_value) :
                 extrusion_value;
             if (absolute_e)
-                last_e = extrusion_value;
+                last_e_by_tool[active_tool] = extrusion_value;
+            else if (last_e != last_e_by_tool.end() && std::isfinite(last_e->second))
+                last_e->second += extrusion_value;
             extrusion = delta > 1e-8;
         }
 
@@ -515,7 +527,8 @@ RewriteResult rewrite_gcode(
     double x = std::numeric_limits<double>::quiet_NaN();
     double y = std::numeric_limits<double>::quiet_NaN();
     double z = std::numeric_limits<double>::quiet_NaN();
-    double last_e = std::numeric_limits<double>::quiet_NaN();
+    int active_tool = 0;
+    std::map<int, double> last_e_by_tool;
     bool absolute_xyz = true;
     bool absolute_e = true;
     double units = 1.0;
@@ -535,6 +548,14 @@ RewriteResult rewrite_gcode(
         }
         const auto parsed = words(code);
 
+        if (cmd.size() > 1 && cmd.front() == 'T' &&
+            std::all_of(cmd.begin() + 1, cmd.end(),
+                [](unsigned char c) { return std::isdigit(c) != 0; })) {
+            active_tool = std::atoi(cmd.c_str() + 1);
+            result.lines.push_back(line);
+            continue;
+        }
+
         if (cmd == "G90") { absolute_xyz = true; result.lines.push_back(line); continue; }
         if (cmd == "G91") { absolute_xyz = false; result.lines.push_back(line); continue; }
         if (cmd == "M82") { absolute_e = true; result.lines.push_back(line); continue; }
@@ -545,7 +566,7 @@ RewriteResult rewrite_gcode(
             if (parsed.count('X')) x = parsed.at('X') * units;
             if (parsed.count('Y')) y = parsed.at('Y') * units;
             if (parsed.count('Z')) z = parsed.at('Z') * units;
-            if (parsed.count('E')) last_e = parsed.at('E') * units;
+            if (parsed.count('E')) last_e_by_tool[active_tool] = parsed.at('E') * units;
             result.lines.push_back(line);
             continue;
         }
@@ -580,11 +601,15 @@ RewriteResult rewrite_gcode(
         bool extrusion = false;
         if (parsed.count('E')) {
             const double extrusion_value = parsed.at('E') * units;
+            auto last_e = last_e_by_tool.find(active_tool);
             const double delta = absolute_e ?
-                (std::isfinite(last_e) ? extrusion_value - last_e : extrusion_value) :
+                (last_e != last_e_by_tool.end() && std::isfinite(last_e->second) ?
+                    extrusion_value - last_e->second : extrusion_value) :
                 extrusion_value;
             if (absolute_e)
-                last_e = extrusion_value;
+                last_e_by_tool[active_tool] = extrusion_value;
+            else if (last_e != last_e_by_tool.end() && std::isfinite(last_e->second))
+                last_e->second += extrusion_value;
             extrusion = delta > 1e-8;
         }
 

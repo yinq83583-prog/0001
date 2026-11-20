@@ -41,6 +41,7 @@ int main() {
     assert(result.downward_connectors==1);
     assert(result.skipped_regions==0);
     assert(result.triangles.size()==12); // 2 top + 2 bottom + 8 wall
+    assert(is_closed_manifold(result.triangles));
     bool bottom=false;
     for(auto const& f:result.triangles)
         if(close(f.a.z,0)&&close(f.b.z,0)&&close(f.c.z,0))bottom=true;

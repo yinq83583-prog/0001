@@ -50,5 +50,15 @@ int main() {
     assert(downward.regions==2);
     assert(downward.bridges==0);
     assert(downward.downward_connectors==2);
+
+    // A painted patch almost on the bed is not turned into a zero-height column.
+    const std::vector<Triangle> near_bed={
+        {{0,0,0.1},{10,0,0.1},{0,10,0.1}}
+    };
+    auto skipped=generate_downward_connectors(near_bed);
+    assert(skipped.regions==1);
+    assert(skipped.downward_connectors==0);
+    assert(skipped.skipped_regions==1);
+    assert(skipped.triangles.empty());
     std::cout<<"Painted Surface Connector native geometry tests passed\n";
 }

@@ -3014,7 +3014,7 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
             m_processor.set_print(print);
             set_mass_locator(m_processor, *print);
             m_processor.initialize(path_tmp);
-            m_processor.process_buffer(gcode);
+            m_processor.process_buffer(gcode, true);
             BOOST_LOG_TRIVIAL(info) << "Layer Time Smooth: " << smooth_report.message
                                     << " layers=" << smooth_report.layers
                                     << " adjusted_moves=" << smooth_report.changed_moves;

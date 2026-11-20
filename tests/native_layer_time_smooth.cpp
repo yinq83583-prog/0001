@@ -41,11 +41,11 @@ int main() {
     // Arc moves are not modified by the smoother, but they must restore
     // the original modal feedrate after a preceding extrusion was slowed.
     std::string arc_gcode =
-        "G21\\nG90\\nM83\\nG92 X0 Y0 Z0 E0\\n"
-        ";LAYER_CHANGE\\n;TYPE:Inner wall\\nG1 X60 Y0 E2 F3600\\n"
-        "G2 X70 Y10 I0 J10 E0.2\\n"
-        ";LAYER_CHANGE\\n;TYPE:Inner wall\\nG1 X1260 Y0 E2 F3600\\n"
-        ";LAYER_CHANGE\\n;TYPE:Inner wall\\nG1 X1320 Y0 E2 F3600\\n";
+        "G21\nG90\nM83\nG92 X0 Y0 Z0 E0\n"
+        ";LAYER_CHANGE\n;TYPE:Inner wall\nG1 X60 Y0 E2 F3600\n"
+        "G2 X70 Y10 I0 J10 E0.2\n"
+        ";LAYER_CHANGE\n;TYPE:Inner wall\nG1 X1260 Y0 E2 F3600\n"
+        ";LAYER_CHANGE\n;TYPE:Inner wall\nG1 X1320 Y0 E2 F3600\n";
     LayerTimeSmoothReport arc_report;
     assert(LayerTimeSmooth::process(arc_gcode,c,&arc_report));
     assert(arc_report.changed_moves > 0);

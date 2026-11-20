@@ -274,6 +274,9 @@ jobs:
       image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
       options: --privileged
       volumes:
+        # Keep Flatpak's OSTree installation on a Docker volume. Runtime updates
+        # rename old SDK checkouts; this avoids OverlayFS EXDEV on affected runners.
+        - /var/lib/flatpak
         - /usr/local/lib/android:/usr/local/lib/android
         - /usr/share/dotnet:/usr/share/dotnet
         - /opt/ghc:/opt/ghc1

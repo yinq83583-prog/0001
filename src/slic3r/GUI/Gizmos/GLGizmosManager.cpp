@@ -506,7 +506,7 @@ void GLGizmosManager::set_hover_id(int id)
 
 void GLGizmosManager::update_section_view()
 {
-    if (m_current != FdmSupports && m_current != Seam && m_current != MmSegmentation && m_current != FuzzySkin && m_current != BrimEars)
+    if (m_current != FdmSupports && m_current != Seam && m_current != MmSegmentation && m_current != FuzzySkin && m_current != PaintedConnector && m_current != BrimEars)
         return;
 
     CommonGizmosDataObjects::ObjectClipper* clipper = m_common_gizmos_data ? m_common_gizmos_data->object_clipper() : nullptr;
@@ -1590,6 +1590,8 @@ std::string get_name_from_gizmo_etype(GLGizmosManager::EType type)
         return "Color Painting";
     case GLGizmosManager::EType::FuzzySkin:
         return "Fuzzy Skin Painting";
+    case GLGizmosManager::EType::PaintedConnector:
+        return "Painted Surface Connector";
     case GLGizmosManager::EType::TextureDisplacement:
         return "Texture Displacement";
     default:

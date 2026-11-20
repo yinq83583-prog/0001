@@ -1,0 +1,22 @@
+name: Native layer time smooth tests
+on:
+  push:
+    branches:
+      - feature/painted-surface-layer-time-smooth-v250
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  native-core:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile native C++ module and tests
+        run: |
+          mkdir -p build-native-tests
+          g++ -std=c++17 -Wall -Wextra -Werror -O2 \
+            src/libslic3r/GCode/LayerTimeSmooth.cpp \
+            tests/native_layer_time_smooth.cpp \
+            -o build-native-tests/layer_time_smooth_test
+      - name: Execute native tests
+        run: build-native-tests/layer_time_smooth_test

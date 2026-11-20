@@ -25,12 +25,17 @@ struct ConnectorOptions {
 struct ConnectorResult {
     std::vector<Triangle> triangles;
     std::size_t regions=0;
+    std::size_t bridges=0;
     std::size_t downward_connectors=0;
     std::size_t skipped_regions=0;
 };
 // Geometry is generated from a painted triangle patch already in the model's
 // world/build-plate coordinates. No dependency on Python or exported 3MF.
 std::vector<Region> connected_painted_regions(const std::vector<Triangle>& painted_facets);
+// Pair distinct mutually facing regions with compatible single-boundary loops;
+ // all other regions use the downward connector fallback.
+ConnectorResult generate_connectors(
+    const std::vector<Triangle>& painted_facets, const ConnectorOptions& options = {});
 ConnectorResult generate_downward_connectors(
     const std::vector<Triangle>& painted_facets, const ConnectorOptions& options = {});
 } // namespace Slic3r::Connector

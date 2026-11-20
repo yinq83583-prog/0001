@@ -433,7 +433,7 @@ void GLGizmoPaintedConnector::generate_connectors()
         return;
 
     const Slic3r::Connector::ConnectorResult generated =
-        Slic3r::Connector::generate_downward_connectors(painted);
+        Slic3r::Connector::generate_connectors(painted);
     if (generated.triangles.empty())
         return;
 
@@ -460,7 +460,7 @@ void GLGizmoPaintedConnector::generate_connectors()
         _u8L("Generate Painted Surface Connector"),
         UndoRedo::SnapshotType::GizmoAction);
 
-    ModelVolume* connector_volume = mo->add_volume(connector_mesh);
+    ModelVolume* connector_volume = mo->add_volume(std::move(connector_mesh), ModelVolumeType::MODEL_PART, false);
     if (!connector_volume)
         return;
 

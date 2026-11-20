@@ -45,6 +45,7 @@ struct Scene {
     Model model;
     DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
     bool share_mesh = false;
+    bool split_model = false;
 
     Scene()
     {
@@ -92,6 +93,7 @@ void save(const std::string &path, Backend backend, Scene &scene)
         params.config = &scene.config;
         params.strategy = SaveStrategy::Zip64 | SaveStrategy::Silence;
         if (scene.share_mesh) params.strategy = params.strategy | SaveStrategy::ShareMesh;
+        if (scene.split_model) params.strategy = params.strategy | SaveStrategy::SplitModel;
         REQUIRE(store_bbs_3mf(params));
     }
 }
@@ -381,6 +383,39 @@ TEST_CASE("Seam metadata restores only recognized modes on compatible base types
         CHECK_FALSE(helper.config.has("sparse_infill_density"));
         CHECK_FALSE(helper.config.has("notes"));
     }
+}
+
+TEST_CASE("Painted Surface Connector annotations survive BBS split-model 3MF round trip", "[PaintedSurfaceConnector3mf][BBS]")
+{
+    Scene source;
+    source.populate(true, true);
+    source.split_model = true;
+    REQUIRE(source.model.objects.size() == 1);
+    ModelObject &object = *source.model.objects.front();
+    REQUIRE(object.volumes.size() == 7);
+    object.volumes[1]->connector_facets.set_triangle_from_string(0, "1");
+    object.volumes[2]->connector_facets.set_triangle_from_string(1, "1");
+    object.volumes[3]->connector_facets.set_triangle_from_string(0, "1");
+
+    ScopedTemporaryFile file(".3mf");
+    save(file.string(), Backend::Bbs, source);
+    Archive archive = read_archive(file.string());
+    CHECK(std::any_of(archive.begin(), archive.end(), [](const auto &entry) {
+        return entry.first.find("3D/Objects/") == 0 &&
+               entry.second.find("paint_connector=\\"1\\"") != std::string::npos;
+    }));
+
+    Scene destination;
+    load(file.string(), Backend::Bbs, destination);
+    REQUIRE(destination.model.objects.size() == 1);
+    REQUIRE(destination.model.objects.front()->volumes.size() == 7);
+    const auto &restored = destination.model.objects.front()->volumes;
+    CHECK(restored[1]->connector_facets.get_triangle_as_string(0) == "1");
+    CHECK(restored[1]->connector_facets.get_triangle_as_string(1).empty());
+    CHECK(restored[2]->connector_facets.get_triangle_as_string(0).empty());
+    CHECK(restored[2]->connector_facets.get_triangle_as_string(1) == "1");
+    CHECK(restored[3]->connector_facets.get_triangle_as_string(0) == "1");
+    CHECK(destination.model.is_connector_painted());
 }
 
 TEST_CASE("Painted Surface Connector annotations survive BBS and Prusa 3MF round trips", "[PaintedSurfaceConnector3mf]")

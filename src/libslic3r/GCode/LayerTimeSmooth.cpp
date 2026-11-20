@@ -1,6 +1,8 @@
 #include "LayerTimeSmooth.hpp"
 
 #include <algorithm>
+#include <cctype>
+#include <map>
 #include <cmath>
 #include <cstdlib>
 #include <limits>

@@ -94,7 +94,6 @@ public:
         FdmSupports,
         Seam,
         FuzzySkin,
-        PaintedConnector,
         MmSegmentation,
         TextureDisplacement,
         Emboss,
@@ -103,6 +102,7 @@ public:
         Assembly,
         Simplify,
         BrimEars,
+        PaintedConnector,
         //SlaSupports,
         // BBS
         //FaceRecognition,

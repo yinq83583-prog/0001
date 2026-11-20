@@ -458,6 +458,7 @@ public:
     bool                    is_mm_painted() const;
     // Checks if any of object volume is painted using the fuzzy skin painting gizmo.
     bool                    is_fuzzy_skin_painted() const;
+    bool                    is_connector_painted() const;
     // This object may have a varying layer height by painting or by a table.
     // Even if true is returned, the layer height profile may be "flat" with no difference to default layering.
     bool                    has_custom_layering() const
@@ -915,6 +916,9 @@ public:
     // List of mesh facets painted for fuzzy skin.
     FacetsAnnotation    fuzzy_skin_facets;
 
+    // Independent paint mask for Painted Surface Connector.
+    FacetsAnnotation    connector_facets;
+
     // One independent paint mask per texture-displacement layer slot (see texture_displacement_layers
     // below). Unlike the other facets fields above, a triangle may be painted (ENFORCER) in more
     // than one of these simultaneously -- that overlap is what makes the layers "blend".
@@ -1146,6 +1150,7 @@ public:
         this->seam_facets.set_new_unique_id();
         this->mmu_segmentation_facets.set_new_unique_id();
         this->fuzzy_skin_facets.set_new_unique_id();
+        this->connector_facets.set_new_unique_id();
         for (int i = 0; i < int(TEXTURE_DISPLACEMENT_MAX_LAYERS); ++i)
             this->texture_displacement_facet(i).set_new_unique_id();
     }
@@ -1154,9 +1159,10 @@ public:
     bool is_seam_painted() const { return !this->seam_facets.empty(); }
     bool is_mm_painted() const { return !this->mmu_segmentation_facets.empty(); }
     bool is_fuzzy_skin_painted() const { return !this->fuzzy_skin_facets.empty(); }
+    bool is_connector_painted() const { return !this->connector_facets.empty(); }
     bool is_texture_displacement_painted() const { return !this->texture_displacement_facets_all_empty(); }
     bool is_any_painted() const {
-        return is_fdm_support_painted() || is_seam_painted() || is_mm_painted() || is_fuzzy_skin_painted() || is_texture_displacement_painted();
+        return is_fdm_support_painted() || is_seam_painted() || is_mm_painted() || is_fuzzy_skin_painted() || is_connector_painted() || is_texture_displacement_painted();
     }
     
     // Orca: Implement prusa's filament shrink compensation approach
@@ -1881,6 +1887,7 @@ public:
     bool          is_mm_painted() const;
     // Checks if any of objects is painted using the fuzzy skin painting gizmo.
     bool          is_fuzzy_skin_painted() const;
+    bool                    is_connector_painted() const;
 
     std::unique_ptr<CalibPressureAdvancePattern> calib_pa_pattern;
 

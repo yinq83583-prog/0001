@@ -106,3 +106,9 @@ The Flatpak x86_64 and aarch64 logs were traced to the same confirmed dependency
 A narrow Boost patch now removes only `include/boost/locale.hpp` from the TREE source list. The existing explicit `source_group("headers" FILES "include/boost/locale.hpp")` continues to group that header separately. The patch is applied only to the Boost 1.84.0 dependency source during its ExternalProject patch step.
 
 The Windows ARM64 failure remains separate: MSVC 14.52 crashes internally (C1001) while compiling third-party OCCT `BRepGraph_LayerTopoSupplement.cxx`. The current Windows x64 build remains the release target and must pass independently.
+
+## Windows ARM64 compiler workaround — 2026-11-20
+
+The ARM64 dependency failure matches a reported regression in GitHub's `windows-11-vs2026-arm` runner image: MSVC 14.52.37025 crashes with C1001 in the compiler backend, while MSVC 14.44.35207 succeeds on the same image. The report reproduces the same compiler internal file (`Utc/src/p2/main.cpp`, line 281) as this run. Microsoft documents `-vcvars_ver=14.44` as the supported way to select an earlier installed toolset.
+
+`build_win.bat` now selects MSVC 14.44 for ARM64 only when the exact side-by-side toolset directory is present. Windows x64 and machines without that installation retain the normal default compiler. This avoids changing the x64 release toolchain while working around the hosted ARM64 compiler regression.

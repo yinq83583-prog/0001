@@ -313,7 +313,9 @@ void GLGizmoPaintedConnector::on_render_input_window(float x, float y, float bot
     m_imgui->disabled_end();
 
     ImGui::SameLine();
-    m_imgui->disabled_begin(!mo->is_connector_painted() || mo->instances.size() != 1);
+    const bool has_generated_connectors = std::any_of(mo->volumes.begin(), mo->volumes.end(),
+        [](const ModelVolume* volume) { return volume->name == "Painted Surface Connector"; });
+    m_imgui->disabled_begin(!mo->is_connector_painted() || mo->instances.size() != 1 || has_generated_connectors);
     if (m_imgui->button(_L("Generate connectors")))
         generate_connectors();
     m_imgui->disabled_end();
@@ -395,6 +397,9 @@ void GLGizmoPaintedConnector::generate_connectors()
 {
     ModelObject* mo = m_c->selection_info() ? m_c->selection_info()->model_object() : nullptr;
     if (!mo || mo->instances.size() != 1 || m_triangle_selectors.empty())
+        return;
+    if (std::any_of(mo->volumes.begin(), mo->volumes.end(),
+        [](const ModelVolume* volume) { return volume->name == "Painted Surface Connector"; }))
         return;
 
     wxBusyCursor wait;

@@ -3304,7 +3304,6 @@ void TabPrint::build()
         // because these are print-process options, not filament cooling controls.
         optgroup = page->new_optgroup(L("Layer time smoothing"), L"param_speed");
         optgroup->append_single_option_line("layer_time_smooth");
-        optgroup->append_single_option_line("layer_time_smooth_max_variation");
         optgroup->append_single_option_line("layer_time_smooth_max_slowdown");
         optgroup->append_single_option_line("layer_time_smooth_min_speed");
         optgroup->append_single_option_line("layer_time_smooth_max_time_increase");
@@ -3319,6 +3318,7 @@ void TabPrint::build()
         optgroup->append_single_option_line("layer_time_smooth_adjust_gap_fill");
         optgroup->append_single_option_line("layer_time_smooth_keep_min_speed");
         optgroup->append_single_option_line("layer_time_smooth_write_layer_report");
+        optgroup->append_single_option_line("layer_time_smooth_manual_profile");
 
     page = add_options_page(L("Support"), "custom-gcode_support"); // ORCA: icon only visible on placeholders
         optgroup = page->new_optgroup(L("Support"), L"param_support");

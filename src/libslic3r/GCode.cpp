@@ -2980,6 +2980,7 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
 
         GCodeSmoothing::LayerTimeSmoothConfig smooth;
         smooth.enabled = true;
+        smooth.max_layer_variation_percent = print->config().layer_time_smooth_max_variation.value;
         smooth.max_slowdown_percent = print->config().layer_time_smooth_max_slowdown.value;
         smooth.min_speed_mm_s = print->config().layer_time_smooth_min_speed.value;
         smooth.max_total_time_increase_percent = print->config().layer_time_smooth_max_time_increase.value;

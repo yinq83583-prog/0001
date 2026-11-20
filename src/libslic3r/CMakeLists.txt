@@ -272,6 +272,8 @@ set(lisbslic3r_sources
     GCode/FanMover.hpp
     GCode/GCodeProcessor.cpp
     GCode/GCodeProcessor.hpp
+    GCode/LayerTimeSmooth.cpp
+    GCode/LayerTimeSmooth.hpp
     GCode/GCodeStatistics.cpp
     GCode/GCodeStatistics.hpp
     GCode/ElegooGCodeProcessorHelper.cpp

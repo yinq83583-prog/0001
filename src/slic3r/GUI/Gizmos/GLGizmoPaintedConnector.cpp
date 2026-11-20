@@ -72,6 +72,8 @@ bool GLGizmoPaintedConnector::on_init()
     m_desc["tool_smart_fill"]   = _L("Smart fill");
     m_desc["cursor_size"]       = _L("Brush size");
     m_desc["paint_connector"]    = _L("Add connector paint");
+    m_desc["paint_connector_caption"] = wxString();
+    m_desc["erase_connector_caption"] = wxString();
     m_desc["erase_connector"] = _L("Remove connector paint");
     m_desc["smart_fill_angle"]  = _L("Smart fill angle");
 

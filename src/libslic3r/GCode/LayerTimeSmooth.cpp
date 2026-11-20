@@ -10,7 +10,7 @@
 #include <sstream>
 #include <utility>
 
-namespace Slic3r::GCode {
+namespace Slic3r::GCodeSmoothing {
 namespace {
 struct Move {
     std::size_t line = 0;
@@ -208,4 +208,4 @@ bool LayerTimeSmooth::process(std::string& gcode,const LayerTimeSmoothConfig& in
     rep.time_after=base_total+added;rep.effective_layer_ratio=ratio;rep.scale_profile=scales;
     return finish(LayerTimeSmoothReport::Status::Processed,"Native Layer Time Smooth V5.2.1 processed.",true);
 }
-} // namespace Slic3r::GCode
+} // namespace Slic3r::GCodeSmoothing

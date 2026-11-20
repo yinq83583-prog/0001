@@ -274,6 +274,8 @@ set(lisbslic3r_sources
     GCode/GCodeProcessor.hpp
     GCode/LayerTimeSmooth.cpp
     GCode/LayerTimeSmooth.hpp
+    Connector/PaintedSurfaceConnector.cpp
+    Connector/PaintedSurfaceConnector.hpp
     GCode/GCodeStatistics.cpp
     GCode/GCodeStatistics.hpp
     GCode/ElegooGCodeProcessorHelper.cpp

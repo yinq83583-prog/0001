@@ -120,27 +120,22 @@ bool get_boundary(const Region& region,std::vector<Vec3>& loop) {
             if(edges.count(e))interior.insert(e);
             else edges.emplace(e,std::make_pair(a,b));
         }
-    std::map<Key,Vec3> from,to;
+    std::map<Key,Vec3> from,to,vertex_positions;
     for(const auto& e:edges){
         if(interior.count(e.first))continue;
-        auto ka=key(e.second.first),kb=key(e.second.second);
+        const Key ka=key(e.second.first),kb=key(e.second.second);
         if(from.count(ka)||to.count(kb))return false;
         from.emplace(ka,e.second.second);
         to.emplace(kb,e.second.first);
+        vertex_positions.emplace(ka,e.second.first);
+        vertex_positions.emplace(kb,e.second.second);
     }
     if(from.size()<3)return false;
-    Key start=from.begin()->first,curr=start;
+    const Key start=from.begin()->first;
+    Key curr=start;
     for(std::size_t i=0;i<from.size();++i) {
-        if(!from.count(curr))return false;
-        auto it=edges.find(Edge{});(void)it;
-        // Reverse-lookup the real vertex from a boundary edge.
-        Vec3 point;
-        bool found=false;
-        for(const auto& p:edges)if(!interior.count(p.first)&&key(p.second.first)==curr){
-            point=p.second.first;found=true;break;
-        }
-        if(!found)return false;
-        loop.push_back(point);
+        if(!from.count(curr)||!vertex_positions.count(curr))return false;
+        loop.push_back(vertex_positions.at(curr));
         curr=key(from.at(curr));
         if(curr==start)return loop.size()==from.size();
     }
@@ -210,7 +205,12 @@ ConnectorResult generate_connectors(const std::vector<Triangle>& painted,
         for(std::size_t j=i+1;j<regions.size();++j){
             Vec3 delta=sub(regions[j].center,regions[i].center);
             const double distance=len(delta);
-            if(distance<=2*options.fit_gap_mm+.01)continue;
+            if(distance<=2*options.fit_gap_mm+.01 ||
+               distance>std::max(0.0,options.max_bridge_distance_mm))continue;
+            const double min_area=std::min(regions[i].area,regions[j].area);
+            const double max_area=std::max(regions[i].area,regions[j].area);
+            if(min_area<=1e-9 ||
+               max_area/min_area>std::max(1.0,options.max_bridge_area_ratio))continue;
             const Vec3 direction=unit(delta);
             if(dot(regions[i].normal,direction)>.45&&
                dot(regions[j].normal,mul(direction,-1))>.45)

@@ -2082,7 +2082,6 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionFloat,              min_skirt_length))
     ((ConfigOptionFloats,             slow_down_layer_time))
     ((ConfigOptionBool,               layer_time_smooth))
-    ((ConfigOptionFloat,              layer_time_smooth_max_variation))
     ((ConfigOptionFloat,              layer_time_smooth_max_slowdown))
     ((ConfigOptionFloat,              layer_time_smooth_min_speed))
     ((ConfigOptionFloat,              layer_time_smooth_max_time_increase))

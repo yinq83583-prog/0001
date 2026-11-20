@@ -2978,7 +2978,7 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
         input.close();
         std::string gcode = input_buffer.str();
 
-        GCode::LayerTimeSmoothConfig smooth;
+        GCodeSmoothing::LayerTimeSmoothConfig smooth;
         smooth.enabled = true;
         smooth.max_layer_variation_percent = print->config().layer_time_smooth_max_variation.value;
         smooth.max_slowdown_percent = print->config().layer_time_smooth_max_slowdown.value;
@@ -2996,8 +2996,8 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
         smooth.write_layer_report = print->config().layer_time_smooth_write_layer_report.value;
         smooth.keep_min_speed = print->config().layer_time_smooth_keep_min_speed.value;
 
-        GCode::LayerTimeSmoothReport smooth_report;
-        if (GCode::LayerTimeSmooth::process(gcode, smooth, &smooth_report)) {
+        GCodeSmoothing::LayerTimeSmoothReport smooth_report;
+        if (GCodeSmoothing::LayerTimeSmooth::process(gcode, smooth, &smooth_report)) {
             boost::nowide::ofstream output(path_tmp.c_str(), std::ios::binary | std::ios::trunc);
             if (!output)
                 throw Slic3r::RuntimeError("Layer Time Smooth could not rewrite the temporary G-code file.");

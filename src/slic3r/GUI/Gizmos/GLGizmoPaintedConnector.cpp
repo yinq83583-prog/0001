@@ -39,6 +39,9 @@
 #include "slic3r/GUI/Gizmos/GLGizmosCommon.hpp"
 #include "slic3r/GUI/I18N.hpp"
 #include "slic3r/GUI/GUI_Utils.hpp"
+#include "libslic3r/Connector/PaintedSurfaceConnector.hpp"
+#include "libslic3r/TriangleMesh.hpp"
+#include "libslic3r/Model.hpp"
 
 namespace Slic3r::GUI {
 
@@ -307,6 +310,12 @@ void GLGizmoPaintedConnector::on_render_input_window(float x, float y, float bot
     m_imgui->disabled_end();
 
     ImGui::SameLine();
+    m_imgui->disabled_begin(!mo->is_connector_painted() || mo->instances.size() != 1);
+    if (m_imgui->button(_L("Generate connectors")))
+        generate_connectors();
+    m_imgui->disabled_end();
+
+    ImGui::SameLine();
     GLGizmoUtils::begin_right_aligned_buttons({_L("Done")});
     if (m_imgui->button(_L("Done"))) {
         m_parent.reset_all_gizmos();
@@ -377,5 +386,93 @@ wxString GLGizmoPaintedConnector::handle_snapshot_action_name(bool shift_down, G
 {
     return shift_down ? _L("Remove connector paint") : _L("Add connector paint");
 }
+
+
+void GLGizmoPaintedConnector::generate_connectors()
+{
+    ModelObject* mo = m_c->selection_info() ? m_c->selection_info()->model_object() : nullptr;
+    if (!mo || mo->instances.size() != 1 || m_triangle_selectors.empty())
+        return;
+
+    wxBusyCursor wait;
+    const Selection& selection = m_parent.get_selection();
+    const std::size_t instance_idx = selection.get_instance_idx();
+    if (instance_idx >= mo->instances.size())
+        return;
+
+    const Transform3d object_to_world = mo->instances[instance_idx]->get_transformation().get_matrix();
+    std::vector<Slic3r::Connector::Triangle> painted;
+    std::size_t selector_idx = 0;
+
+    for (const ModelVolume* volume : mo->volumes) {
+        if (!volume->is_model_part())
+            continue;
+        if (selector_idx >= m_triangle_selectors.size())
+            return;
+
+        const indexed_triangle_set selected = m_triangle_selectors[selector_idx++]->get_facets(EnforcerBlockerType::ENFORCER);
+        const Transform3d volume_to_world = object_to_world * volume->get_matrix();
+        const auto& vertices = volume->mesh().its.vertices;
+
+        for (const Vec3i32& face : selected.indices) {
+            const Vec3d a = volume_to_world * vertices[face(0)].cast<double>();
+            const Vec3d b = volume_to_world * vertices[face(1)].cast<double>();
+            const Vec3d c = volume_to_world * vertices[face(2)].cast<double>();
+            painted.push_back({
+                {a.x(), a.y(), a.z()},
+                {b.x(), b.y(), b.z()},
+                {c.x(), c.y(), c.z()}
+            });
+        }
+    }
+
+    if (painted.empty())
+        return;
+
+    const Slic3r::Connector::ConnectorResult generated =
+        Slic3r::Connector::generate_downward_connectors(painted);
+    if (generated.triangles.empty())
+        return;
+
+    indexed_triangle_set connector_its;
+    connector_its.vertices.reserve(generated.triangles.size() * 3);
+    connector_its.indices.reserve(generated.triangles.size());
+    const Transform3d world_to_object = object_to_world.inverse();
+
+    for (const auto& triangle : generated.triangles) {
+        const std::array<Slic3r::Connector::Vec3, 3> points = {triangle.a, triangle.b, triangle.c};
+        const int first = static_cast<int>(connector_its.vertices.size());
+        for (const auto& point : points) {
+            const Vec3d world(point.x, point.y, point.z);
+            connector_its.vertices.emplace_back((world_to_object * world).cast<float>());
+        }
+        connector_its.indices.emplace_back(first, first + 1, first + 2);
+    }
+
+    TriangleMesh connector_mesh(std::move(connector_its));
+    if (connector_mesh.empty())
+        return;
+
+    Plater::TakeSnapshot snapshot(wxGetApp().plater(),
+        _u8L("Generate Painted Surface Connector"),
+        UndoRedo::SnapshotType::GizmoAction);
+
+    ModelVolume* connector_volume = mo->add_volume(connector_mesh);
+    if (!connector_volume)
+        return;
+
+    connector_volume->name = "Painted Surface Connector";
+    connector_volume->set_type(ModelVolumeType::MODEL_PART);
+    mo->invalidate_bounding_box();
+
+    const ModelObjectPtrs& objects = wxGetApp().model().objects;
+    const auto it = std::find(objects.begin(), objects.end(), mo);
+    if (it != objects.end())
+        wxGetApp().obj_list()->update_info_items(std::distance(objects.begin(), it));
+
+    m_parent.post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
+    m_parent.set_as_dirty();
+}
+
 
 } // namespace Slic3r::GUI

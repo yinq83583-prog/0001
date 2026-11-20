@@ -147,6 +147,15 @@ void append_cap(std::vector<Triangle>& dst,const Region& region,Vec3 offset) {
     for(const Triangle& tri:region.facets)
         dst.push_back({add(tri.a,offset),add(tri.c,offset),add(tri.b,offset)});
 }
+std::vector<double> normalized_loop_fractions(const std::vector<Vec3>& loop) {
+    std::vector<double> fractions(loop.size()+1,0.0);
+    for(std::size_t i=0;i<loop.size();++i)
+        fractions[i+1]=fractions[i]+len(sub(loop[(i+1)%loop.size()],loop[i]));
+    const double perimeter=fractions.back();
+    if(perimeter>1e-9)
+        for(double& value:fractions)value/=perimeter;
+    return fractions;
+}
 std::vector<Vec3> resample_loop(const std::vector<Vec3>& loop,std::size_t count) {
     if(loop.size()<3||count<3)return {};
     std::vector<double> cumulative(loop.size()+1,0.0);
@@ -218,10 +227,15 @@ bool bridge_regions(const Region& a,const Region& b,double gap,std::vector<Trian
 
     // Zipper triangulation supports different boundary vertex counts without
     // introducing T-junctions between the generated side walls and end caps.
+    // Advance by normalized perimeter distance, not vertex index, so uneven
+    // mesh tessellation does not twist the bridge strip.
+    const std::vector<double> fractions_a=normalized_loop_fractions(aa);
+    const std::vector<double> fractions_b=normalized_loop_fractions(bb);
+    if(fractions_a.back()<=0.0||fractions_b.back()<=0.0)return false;
     std::size_t i=0,j=0;
     while(i<aa.size()||j<bb.size()) {
-        const double next_a=i<aa.size()?static_cast<double>(i+1)/aa.size():std::numeric_limits<double>::infinity();
-        const double next_b=j<bb.size()?static_cast<double>(j+1)/bb.size():std::numeric_limits<double>::infinity();
+        const double next_a=i<aa.size()?fractions_a[i+1]:std::numeric_limits<double>::infinity();
+        const double next_b=j<bb.size()?fractions_b[j+1]:std::numeric_limits<double>::infinity();
         const Vec3 a0=aa[i%aa.size()];
         const Vec3 b0=bb[j%bb.size()];
         if(std::abs(next_a-next_b)<1e-12) {

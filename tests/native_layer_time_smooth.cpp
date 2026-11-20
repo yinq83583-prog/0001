@@ -28,6 +28,9 @@ int main() {
     assert(report.status==LayerTimeSmoothReport::Status::Processed);
     assert(report.layers==3);
     assert(report.changed_moves>0);
+    assert(report.time_after>=report.time_before);
+    assert(report.max_jump_before>=0.0);
+    assert(report.max_jump_after>=0.0);
     assert(gcode.find("G1 X60 Y0 E2 F")!=std::string::npos);
     assert(gcode.find("G0 X1330 Y0 F3600.0")!=std::string::npos);
     assert(gcode.find("; LAYER_TIME_SMOOTH_V521_NATIVE")!=std::string::npos);

@@ -2328,6 +2328,7 @@ void ModelObject::split(ModelObjectPtrs* new_objects, const bool remap_paint)
                 COPY_FACETS(seam_facets);
                 COPY_FACETS(mmu_segmentation_facets);
                 COPY_FACETS(fuzzy_skin_facets);
+                COPY_FACETS(connector_facets);
             } else if (saved_painting) {
                 // Geometry changed, attempt to remap them to the new mesh
                 new_vol->restore_painting(saved_painting);

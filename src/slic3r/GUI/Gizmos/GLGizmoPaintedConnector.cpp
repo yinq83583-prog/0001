@@ -1,6 +1,7 @@
 #include "GLGizmoPaintedConnector.hpp"
 
 #include "libslic3r/Model.hpp"
+#include <array>
 #include "libslic3r/Print.hpp"
 
 #include "slic3r/GUI/GLCanvas3D.hpp"
@@ -412,7 +413,7 @@ void GLGizmoPaintedConnector::generate_connectors()
 
         const indexed_triangle_set selected = m_triangle_selectors[selector_idx++]->get_facets(EnforcerBlockerType::ENFORCER);
         const Transform3d volume_to_world = object_to_world * volume->get_matrix();
-        const auto& vertices = volume->mesh().its.vertices;
+        const auto& vertices = selected.vertices;
 
         for (const Vec3i32& face : selected.indices) {
             const Vec3d a = volume_to_world * vertices[face(0)].cast<double>();

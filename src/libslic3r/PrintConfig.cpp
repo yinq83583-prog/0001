@@ -6821,102 +6821,102 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("layer_time_smooth", coBool);
     def->label = L("Smooth layer time transitions");
-    def->category = L("Cooling");
+    def->category = L("Speed");
     def->tooltip = L("Smooth large print-time differences between adjacent layers by adjusting eligible extrusion feedrates in exported G-code.");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("layer_time_smooth_max_slowdown", coFloat);
     def->label = L("Maximum slowdown");
-    def->category = L("Cooling");
+    def->category = L("Speed");
     def->sidetext = L("%");
     def->min = 0; def->max = 70; def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(30.0));
 
     def = this->add("layer_time_smooth_min_speed", coFloat);
     def->label = L("Minimum extrusion speed");
-    def->category = L("Cooling");
+    def->category = L("Speed");
     def->sidetext = L("mm/s");
     def->min = 1; def->max = 100; def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(18.0));
 
     def = this->add("layer_time_smooth_max_time_increase", coFloat);
     def->label = L("Maximum total time increase");
-    def->category = L("Cooling");
+    def->category = L("Speed");
     def->sidetext = L("%");
     def->min = 0; def->max = 50; def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(15.0));
 
     def = this->add("layer_time_smooth_smoothing_radius", coInt);
     def->label = L("Smoothing radius");
-    def->category = L("Cooling");
+    def->category = L("Speed");
     def->sidetext = L("layers");
     def->min = 1; def->max = 20; def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionInt(5));
 
     def = this->add("layer_time_smooth_quality_speed", coFloat);
     def->label = L("Smoothing strength");
-    def->category = L("Cooling");
+    def->category = L("Speed");
     def->min = 0; def->max = 1; def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0.5));
 
     def = this->add("layer_time_smooth_preserve_outer_walls", coBool);
     def->label = L("Preserve outer walls");
-    def->category = L("Cooling");
+    def->category = L("Speed");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(true));
 
     def = this->add("layer_time_smooth_adjust_inner_walls", coBool);
     def->label = L("Adjust inner walls");
-    def->category = L("Cooling");
+    def->category = L("Speed");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(true));
 
     def = this->add("layer_time_smooth_adjust_infill", coBool);
     def->label = L("Adjust infill");
-    def->category = L("Cooling");
+    def->category = L("Speed");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(true));
 
     def = this->add("layer_time_smooth_adjust_top_surface", coBool);
     def->label = L("Adjust top surfaces");
-    def->category = L("Cooling");
+    def->category = L("Speed");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(true));
 
     def = this->add("layer_time_smooth_adjust_support", coBool);
     def->label = L("Adjust support");
-    def->category = L("Cooling");
+    def->category = L("Speed");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("layer_time_smooth_adjust_bridges", coBool);
     def->label = L("Adjust bridges");
-    def->category = L("Cooling");
+    def->category = L("Speed");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("layer_time_smooth_adjust_gap_fill", coBool);
     def->label = L("Adjust gap fill");
-    def->category = L("Cooling");
+    def->category = L("Speed");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("layer_time_smooth_write_layer_report", coBool);
     def->label = L("Write layer-time report to G-code");
-    def->category = L("Cooling");
+    def->category = L("Speed");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(true));
 
     def = this->add("layer_time_smooth_keep_min_speed", coBool);
     def->label = L("Enforce minimum speed");
-    def->category = L("Cooling");
+    def->category = L("Speed");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(true));
 
     def = this->add("layer_time_smooth_manual_profile", coFloats);
     def->label = L("Manual layer smoothing profile");
-    def->category = L("Cooling");
+    def->category = L("Speed");
     def->tooltip = L("64 normalized values from the bottom to the top of the model. 1 keeps full smoothing strength; 0 disables smoothing at that height.");
     def->min = 0; def->max = 1; def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloats(64, 1.0));

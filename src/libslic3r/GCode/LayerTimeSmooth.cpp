@@ -386,7 +386,7 @@ std::vector<double> shape_targets(
     std::vector<double> shaped;
     shaped.reserve(times.size());
     for (std::size_t i = 0; i < times.size(); ++i) {
-        const double strength = profile_at(config.manual_profile,
+        const double strength = config.quality_speed * profile_at(config.manual_profile,
             static_cast<double>(i) / static_cast<double>(std::max<std::size_t>(1, times.size() - 1)));
         const double value = times[i] + std::max(0.0, smooth_extra[i]) * strength;
         shaped.push_back(clampv(value, times[i], std::max(times[i], caps[i])));
@@ -669,8 +669,8 @@ bool LayerTimeSmooth::process(
     config.max_slowdown_percent = clampv(config.max_slowdown_percent, 0.0, 70.0);
     config.min_speed_mm_s = clampv(config.min_speed_mm_s, 1.0, 100.0);
     config.max_total_time_increase_percent = clampv(config.max_total_time_increase_percent, 0.0, 50.0);
+    config.max_layer_variation_percent = clampv(config.max_layer_variation_percent, 0.0, 100.0);
     config.quality_speed = clampv(config.quality_speed, 0.0, 1.0);
-    config.max_layer_variation_percent = 10.0 + 40.0 * config.quality_speed;
     config.smooth_radius = static_cast<int>(clampv(config.smooth_radius, 1.0, 20.0));
     if (config.manual_profile.size() != 64)
         config.manual_profile.assign(64, 1.0);

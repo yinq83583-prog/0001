@@ -43,7 +43,7 @@ std::vector<Region> connected_painted_regions(const std::vector<Triangle>& paint
     std::map<Edge,std::size_t> owners;
     for(std::size_t i=0;i<painted.size();++i){
         const auto& t=painted[i];
-        for(const Edge e:{edge(t.a,t.b),edge(t.b,t.c),edge(t.c,t.a)}){
+        for(const Edge& e:{edge(t.a,t.b),edge(t.b,t.c),edge(t.c,t.a)}){
             auto [it,inserted]=owners.emplace(e,i);
             if(!inserted)ds.join(i,it->second);
         }

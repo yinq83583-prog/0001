@@ -41,6 +41,20 @@ int main() {
     assert(connected.downward_connectors==0);
     assert(connected.triangles.size()==8); // 6 side + 2 conformal caps
 
+    // Different boundary triangulations are resampled to a common loop.
+    const std::vector<Triangle> mismatched_loops={
+        {{0,0,3},{10,0,3},{10,10,3}},
+        {{0,0,3},{10,10,3},{0,10,3}},
+        {{0,0,8},{0,10,8},{5,0,8}},
+        {{5,0,8},{10,10,8},{10,0,8}},
+        {{5,0,8},{0,10,8},{10,10,8}}
+    };
+    auto resampled_bridge=generate_connectors(mismatched_loops);
+    assert(resampled_bridge.regions==2);
+    assert(resampled_bridge.bridges==1);
+    assert(resampled_bridge.downward_connectors==0);
+    assert(resampled_bridge.triangles.size()==20);
+
     // Distant painted islands are not accidentally joined.
     const std::vector<Triangle> distant={
         {{0,0,3},{10,0,3},{0,10,3}},

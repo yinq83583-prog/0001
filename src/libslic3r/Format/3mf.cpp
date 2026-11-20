@@ -87,10 +87,12 @@ const char* SLIC3RPE_3MF_VERSION = "slic3rpe:Version3mf"; // definition of the m
 const unsigned int FDM_SUPPORTS_PAINTING_VERSION = 1;
 const unsigned int SEAM_PAINTING_VERSION         = 1;
 const unsigned int MM_PAINTING_VERSION           = 1;
+const unsigned int CONNECTOR_PAINTING_VERSION    = 1;
 
 const std::string SLIC3RPE_FDM_SUPPORTS_PAINTING_VERSION = "slic3rpe:FdmSupportsPaintingVersion";
 const std::string SLIC3RPE_SEAM_PAINTING_VERSION         = "slic3rpe:SeamPaintingVersion";
 const std::string SLIC3RPE_MM_PAINTING_VERSION           = "slic3rpe:MmPaintingVersion";
+const std::string SLIC3RPE_CONNECTOR_PAINTING_VERSION    = "slic3rpe:ConnectorPaintingVersion";
 
 const std::string MODEL_FOLDER = "3D/";
 const std::string MODEL_EXTENSION = ".model";
@@ -141,6 +143,7 @@ static constexpr const char* CUSTOM_SUPPORTS_ATTR = "slic3rpe:custom_supports";
 static constexpr const char* CUSTOM_SEAM_ATTR = "slic3rpe:custom_seam";
 static constexpr const char* MMU_SEGMENTATION_ATTR = "slic3rpe:mmu_segmentation";
 static constexpr const char* FUZZY_SKIN_ATTR = "slic3rpe:fuzzy_skin";
+static constexpr const char* CONNECTOR_PAINTING_ATTR = "slic3rpe:connector_painting";
 
 static constexpr const char* KEY_ATTR = "key";
 static constexpr const char* VALUE_ATTR = "value";
@@ -461,6 +464,7 @@ ModelVolumeType type_from_string(const std::string &s)
             std::vector<std::string> custom_seam;
             std::vector<std::string> mmu_segmentation;
             std::vector<std::string> fuzzy_skin;
+            std::vector<std::string> connector_painting;
 
             bool empty() { return vertices.empty() || triangles.empty(); }
 
@@ -471,6 +475,7 @@ ModelVolumeType type_from_string(const std::string &s)
                 custom_seam.clear();
                 mmu_segmentation.clear();
                 fuzzy_skin.clear();
+                connector_painting.clear();
             }
         };
 
@@ -569,6 +574,7 @@ ModelVolumeType type_from_string(const std::string &s)
         unsigned int m_fdm_supports_painting_version = 0;
         unsigned int m_seam_painting_version         = 0;
         unsigned int m_mm_painting_version           = 0;
+        unsigned int m_connector_painting_version    = 0;
 
         XML_Parser m_xml_parser;
         // Error code returned by the application side of the parser. In that case the expat may not reliably deliver the error state
@@ -725,6 +731,7 @@ ModelVolumeType type_from_string(const std::string &s)
         m_fdm_supports_painting_version = 0;
         m_seam_painting_version = 0;
         m_mm_painting_version = 0;
+        m_connector_painting_version = 0;
         m_check_version = check_version;
         m_model = &model;
         m_unit_factor = 1.0f;
@@ -1793,6 +1800,7 @@ ModelVolumeType type_from_string(const std::string &s)
         m_curr_object.geometry.custom_seam.push_back(get_attribute_value_string(attributes, num_attributes, CUSTOM_SEAM_ATTR));
         m_curr_object.geometry.fuzzy_skin.push_back(get_attribute_value_string(attributes, num_attributes, FUZZY_SKIN_ATTR));
         m_curr_object.geometry.mmu_segmentation.push_back(get_attribute_value_string(attributes, num_attributes, MMU_SEGMENTATION_ATTR));
+        m_curr_object.geometry.connector_painting.push_back(get_attribute_value_string(attributes, num_attributes, CONNECTOR_PAINTING_ATTR));
         return true;
     }
 
@@ -1918,6 +1926,10 @@ ModelVolumeType type_from_string(const std::string &s)
             m_mm_painting_version = (unsigned int) atoi(m_curr_characters.c_str());
             check_painting_version(m_mm_painting_version, MM_PAINTING_VERSION,
                 _(L("The selected 3MF contains multi-material painted object using a newer version of PrusaSlicer and is not compatible.")));
+        } else if (m_curr_metadata_name == SLIC3RPE_CONNECTOR_PAINTING_VERSION) {
+            m_connector_painting_version = (unsigned int) atoi(m_curr_characters.c_str());
+            check_painting_version(m_connector_painting_version, CONNECTOR_PAINTING_VERSION,
+                _(L("The selected 3MF contains connector painting data from a newer version and is not compatible.")));
         }
 
         return true;
@@ -2211,6 +2223,7 @@ ModelVolumeType type_from_string(const std::string &s)
             volume->seam_facets.reserve(triangles_count);
             volume->mmu_segmentation_facets.reserve(triangles_count);
             volume->fuzzy_skin_facets.reserve(triangles_count);
+            volume->connector_facets.reserve(triangles_count);
             for (size_t i=0; i<triangles_count; ++i) {
                 size_t index = volume_data.first_triangle_id + i;
                 assert(index < geometry.custom_supports.size());
@@ -2224,11 +2237,14 @@ ModelVolumeType type_from_string(const std::string &s)
                     volume->mmu_segmentation_facets.set_triangle_from_string(i, geometry.mmu_segmentation[index]);
                 if (! geometry.fuzzy_skin[index].empty())
                 	volume->fuzzy_skin_facets.set_triangle_from_string(i, geometry.fuzzy_skin[index]);
+                if (! geometry.connector_painting[index].empty())
+                    volume->connector_facets.set_triangle_from_string(i, geometry.connector_painting[index]);
             }
             volume->supported_facets.shrink_to_fit();
             volume->seam_facets.shrink_to_fit();
             volume->mmu_segmentation_facets.shrink_to_fit();
             volume->fuzzy_skin_facets.shrink_to_fit();
+            volume->connector_facets.shrink_to_fit();
 
             // Apply the seam mode after all base-type metadata, regardless of XML key order.
             ModelVolumeType precise_seam_type = ModelVolumeType::INVALID;
@@ -2623,6 +2639,9 @@ ModelVolumeType type_from_string(const std::string &s)
             if (model.is_mm_painted())
                 stream << " <" << METADATA_TAG << " name=\"" << SLIC3RPE_MM_PAINTING_VERSION << "\">" << MM_PAINTING_VERSION << "</" << METADATA_TAG << ">\n";
 
+            if (model.is_connector_painted())
+                stream << " <" << METADATA_TAG << " name=\"" << SLIC3RPE_CONNECTOR_PAINTING_VERSION << "\">" << CONNECTOR_PAINTING_VERSION << "</" << METADATA_TAG << ">\n";
+
             std::string name = xml_escape(boost::filesystem::path(filename).stem().string());
             stream << " <" << METADATA_TAG << " name=\"Title\">" << name << "</" << METADATA_TAG << ">\n";
             stream << " <" << METADATA_TAG << " name=\"Designer\">" << "</" << METADATA_TAG << ">\n";
@@ -2910,6 +2929,15 @@ ModelVolumeType type_from_string(const std::string &s)
                     output_buffer += FUZZY_SKIN_ATTR;
                     output_buffer += "=\"";
                     output_buffer += fuzzy_skin_data_string;
+                    output_buffer += "\"";
+                }
+
+                std::string connector_painting_data_string = volume->connector_facets.get_triangle_as_string(i);
+                if (!connector_painting_data_string.empty()) {
+                    output_buffer += " ";
+                    output_buffer += CONNECTOR_PAINTING_ATTR;
+                    output_buffer += "=\"";
+                    output_buffer += connector_painting_data_string;
                     output_buffer += "\"";
                 }
 

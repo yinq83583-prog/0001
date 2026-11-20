@@ -33,7 +33,7 @@ int main() {
     assert(report.max_jump_after>=0.0);
     assert(gcode.find("G1 X60 Y0 E2 F")!=std::string::npos);
     assert(gcode.find("G0 X1330 Y0 F3600.0")!=std::string::npos);
-    assert(gcode.find("; LAYER_TIME_SMOOTH_V521_NATIVE")!=std::string::npos);
+    assert(gcode.find("; LAYER_TIME_SMOOTH_V5_PROCESSED")!=std::string::npos);
     const std::string once=gcode;
     assert(!LayerTimeSmooth::process(gcode,c,&report));
     assert(gcode==once);

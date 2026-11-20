@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace Slic3r::GCode {
+namespace Slic3r::GCodeSmoothing {
 
 // Native C++ port of Layer Time Smooth V5.2.1.
 // Feedrate-only transformation: XYZ and extrusion coordinates are never rewritten.
@@ -56,4 +56,4 @@ public:
                         LayerTimeSmoothReport* report = nullptr);
 };
 
-} // namespace Slic3r::GCode
+} // namespace Slic3r::GCodeSmoothing

@@ -81,6 +81,16 @@ std::string command(const std::string& code)
     return result;
 }
 
+bool is_linear_motion_command(const std::string& cmd)
+{
+    return cmd == "G0" || cmd == "G00" || cmd == "G1" || cmd == "G01";
+}
+
+bool is_arc_motion_command(const std::string& cmd)
+{
+    return cmd == "G2" || cmd == "G02" || cmd == "G3" || cmd == "G03";
+}
+
 std::map<char, double> words(const std::string& code)
 {
     static const std::regex word_re(R"(([A-Za-z])\s*(-?(?:\d+(?:\.\d*)?|\.\d+)))");
@@ -243,7 +253,9 @@ Analysis analyze_gcode(const std::vector<std::string>& lines, const LayerTimeSmo
             if (parsed.count('E')) last_e_by_tool[active_tool] = parsed.at('E') * units;
             continue;
         }
-        if (cmd != "G0" && cmd != "G00" && cmd != "G1" && cmd != "G01")
+        const bool linear_motion = is_linear_motion_command(cmd);
+        const bool arc_motion = is_arc_motion_command(cmd);
+        if (!linear_motion && !arc_motion)
             continue;
 
         if (parsed.count('F'))
@@ -292,7 +304,7 @@ Analysis analyze_gcode(const std::vector<std::string>& lines, const LayerTimeSmo
         LayerStats& stats = result.stats[static_cast<std::size_t>(layer_index)];
         const double duration = distance / (feed / 60.0);
         stats.total += duration;
-        const bool eligible = extrusion && role_allowed(role, config);
+        const bool eligible = linear_motion && extrusion && role_allowed(role, config);
         if (eligible) {
             stats.adjustable += duration;
             ++stats.eligible;
@@ -574,7 +586,9 @@ RewriteResult rewrite_gcode(
             result.lines.push_back(line);
             continue;
         }
-        if (cmd != "G0" && cmd != "G00" && cmd != "G1" && cmd != "G01") {
+        const bool linear_motion = is_linear_motion_command(cmd);
+        const bool arc_motion = is_arc_motion_command(cmd);
+        if (!linear_motion && !arc_motion) {
             result.lines.push_back(line);
             continue;
         }
@@ -618,7 +632,7 @@ RewriteResult rewrite_gcode(
         }
 
         const int layer_index = analysis.line_to_layer[index];
-        const bool eligible = layer_index >= 0 && distance > 1e-8 && extrusion &&
+        const bool eligible = linear_motion && layer_index >= 0 && distance > 1e-8 && extrusion &&
             role_allowed(role, config) && original_feed > 0.0;
         double desired_feed = original_feed;
         if (eligible) {

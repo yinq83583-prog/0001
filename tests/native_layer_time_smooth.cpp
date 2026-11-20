@@ -49,5 +49,21 @@ int main() {
     c.enabled=true;
     assert(!LayerTimeSmooth::process(no_layers,c,&report));
     assert(no_layers==no_layers_before);
+
+    // V5.2.1 also recognizes changing Z-height comments when layer markers are absent.
+    std::string z_marked =
+        "G21\nG90\nM83\nG92 X0 Y0 Z0 E0\n"
+        ";Z_HEIGHT:0.2\n;FEATURE:Inner_wall\nG1 X60 Y0 E2 F3600\n"
+        ";Z_HEIGHT:0.4\n;FEATURE:Inner_wall\nG1 X1260 Y0 E2 F3600\n"
+        ";Z_HEIGHT:0.6\n;FEATURE:Inner_wall\nG1 X1320 Y0 E2 F3600\n";
+    assert(LayerTimeSmooth::process(z_marked,c,&report));
+    assert(report.layers==3);
+
+    // A zero manual-profile envelope must leave the G-code unchanged.
+    c.manual_profile.assign(64,0.0);
+    auto profile_disabled=sample();
+    const auto profile_before=profile_disabled;
+    assert(!LayerTimeSmooth::process(profile_disabled,c,&report));
+    assert(profile_disabled==profile_before);
     std::cout<<"Layer Time Smooth native unit tests passed\n";
 }

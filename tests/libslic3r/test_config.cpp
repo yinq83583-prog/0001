@@ -7,6 +7,7 @@
 #include <catch2/generators/catch_generators.hpp>
 #include "catch2/catch_approx.hpp"
 #include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/Point.hpp"
 #include "libslic3r/PrintConfigConstants.hpp"
 #include "libslic3r/LocalesUtils.hpp"
 

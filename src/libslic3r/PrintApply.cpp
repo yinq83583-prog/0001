@@ -121,6 +121,8 @@ static inline void model_volume_list_copy_configs(ModelObject &model_object_dst,
         mv_dst.mmu_segmentation_facets.assign(mv_src.mmu_segmentation_facets);
         assert(mv_dst.fuzzy_skin_facets.id() == mv_src.fuzzy_skin_facets.id());
         mv_dst.fuzzy_skin_facets.assign(mv_src.fuzzy_skin_facets);
+        assert(mv_dst.connector_facets.id() == mv_src.connector_facets.id());
+        mv_dst.connector_facets.assign(mv_src.connector_facets);
         //FIXME what to do with the materials?
         // mv_dst.m_material_id = mv_src.m_material_id;
         ++ i_src;

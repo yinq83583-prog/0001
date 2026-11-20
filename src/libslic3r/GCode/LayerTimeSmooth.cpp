@@ -91,7 +91,7 @@ bool LayerTimeSmooth::process(std::string& gcode,const LayerTimeSmoothConfig& in
         return finish(LayerTimeSmoothReport::Status::AlreadyProcessed,"G-code already processed; skipped.");
     LayerTimeSmoothConfig c=input;
     c.quality_speed=clampv(c.quality_speed,0,1);
-    c.max_layer_variation_percent=10+40*c.quality_speed;
+    c.max_layer_variation_percent=clampv(c.max_layer_variation_percent,5,100);
     c.max_slowdown_percent=clampv(c.max_slowdown_percent,0,70);
     c.min_speed_mm_s=clampv(c.min_speed_mm_s,1,100);
     c.max_total_time_increase_percent=clampv(c.max_total_time_increase_percent,0,50);
@@ -146,10 +146,20 @@ bool LayerTimeSmooth::process(std::string& gcode,const LayerTimeSmoothConfig& in
     }
     std::vector<double> extra(target.size());for(std::size_t i=0;i<target.size();++i)extra[i]=std::max(0.0,target[i]-times[i]);
     extra=gaussian(extra,c.smooth_radius);
-    for(std::size_t i=0;i<target.size();++i)target[i]=std::min(caps[i],times[i]+extra[i]*profile_at(c.manual_profile,double(i)/std::max<std::size_t>(1,target.size()-1)));
+    for(std::size_t i=0;i<target.size();++i)target[i]=std::min(caps[i],times[i]+extra[i]*c.quality_speed*profile_at(c.manual_profile,double(i)/std::max<std::size_t>(1,target.size()-1)));
     double base_total=0,added=0;for(std::size_t i=0;i<times.size();++i){base_total+=times[i];added+=target[i]-times[i];}
     const double budget=base_total*c.max_total_time_increase_percent/100.0;
     if(added>budget+1e-6&&added>0){double scale=budget/added;for(std::size_t i=0;i<target.size();++i)target[i]=times[i]+(target[i]-times[i])*scale;}
+    added=0.0;
+    for(std::size_t i=0;i<times.size();++i)added+=target[i]-times[i];
+    auto max_relative_jump=[](const std::vector<double>& values){
+        double jump=0.0;
+        for(std::size_t i=1;i<values.size();++i)
+            jump=std::max(jump,std::abs(values[i]-values[i-1])/std::max(0.001,std::min(values[i],values[i-1])));
+        return jump;
+    };
+    rep.max_jump_before=max_relative_jump(times);
+    rep.max_jump_after=max_relative_jump(target);
     std::vector<double> scales(layers.size(),1.0);
     for(std::size_t i=0;i<layers.size();++i){const auto& l=layers[i];if(l.adjustable<=1e-9||target[i]<=times[i]+1e-8)continue;
         const double desired=std::max(l.adjustable,target[i]-l.fixed);double lo=.01,hi=1;

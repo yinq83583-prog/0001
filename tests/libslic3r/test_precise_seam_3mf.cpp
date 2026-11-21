@@ -393,9 +393,11 @@ TEST_CASE("Painted Surface Connector annotations survive BBS split-model 3MF rou
     REQUIRE(source.model.objects.size() == 1);
     ModelObject &object = *source.model.objects.front();
     REQUIRE(object.volumes.size() == 7);
-    object.volumes[1]->connector_facets.set_triangle_from_string(0, "1");
-    object.volumes[2]->connector_facets.set_triangle_from_string(1, "1");
-    object.volumes[3]->connector_facets.set_triangle_from_string(0, "1");
+    // A painted, unsplit triangle in state 1 is encoded as hex 4 (state << 2).
+    // Hex 1 is a split marker without child nodes and is malformed.
+    object.volumes[1]->connector_facets.set_triangle_from_string(0, "4");
+    object.volumes[2]->connector_facets.set_triangle_from_string(1, "4");
+    object.volumes[3]->connector_facets.set_triangle_from_string(0, "4");
 
     ScopedTemporaryFile file(".3mf");
     save(file.string(), Backend::Bbs, source);
@@ -410,11 +412,11 @@ TEST_CASE("Painted Surface Connector annotations survive BBS split-model 3MF rou
     REQUIRE(destination.model.objects.size() == 1);
     REQUIRE(destination.model.objects.front()->volumes.size() == 7);
     const auto &restored = destination.model.objects.front()->volumes;
-    CHECK(restored[1]->connector_facets.get_triangle_as_string(0) == "1");
+    CHECK(restored[1]->connector_facets.get_triangle_as_string(0) == "4");
     CHECK(restored[1]->connector_facets.get_triangle_as_string(1).empty());
     CHECK(restored[2]->connector_facets.get_triangle_as_string(0).empty());
-    CHECK(restored[2]->connector_facets.get_triangle_as_string(1) == "1");
-    CHECK(restored[3]->connector_facets.get_triangle_as_string(0) == "1");
+    CHECK(restored[2]->connector_facets.get_triangle_as_string(1) == "4");
+    CHECK(restored[3]->connector_facets.get_triangle_as_string(0) == "4");
     CHECK(destination.model.is_connector_painted());
 }
 
@@ -431,9 +433,9 @@ TEST_CASE("Painted Surface Connector annotations survive BBS and Prusa 3MF round
 
     // Three helper volumes share the same mesh when requested. Different paint masks
     // must force distinct BBS mesh resources; an identical mask may still share safely.
-    object.volumes[1]->connector_facets.set_triangle_from_string(0, "1");
-    object.volumes[2]->connector_facets.set_triangle_from_string(1, "1");
-    object.volumes[3]->connector_facets.set_triangle_from_string(0, "1");
+    object.volumes[1]->connector_facets.set_triangle_from_string(0, "4");
+    object.volumes[2]->connector_facets.set_triangle_from_string(1, "4");
+    object.volumes[3]->connector_facets.set_triangle_from_string(0, "4");
     REQUIRE(source.model.is_connector_painted());
 
     ScopedTemporaryFile file(".3mf");
@@ -453,11 +455,11 @@ TEST_CASE("Painted Surface Connector annotations survive BBS and Prusa 3MF round
     REQUIRE(destination.model.objects.size() == 1);
     REQUIRE(destination.model.objects.front()->volumes.size() == 7);
     const auto &restored = destination.model.objects.front()->volumes;
-    CHECK(restored[1]->connector_facets.get_triangle_as_string(0) == "1");
+    CHECK(restored[1]->connector_facets.get_triangle_as_string(0) == "4");
     CHECK(restored[1]->connector_facets.get_triangle_as_string(1).empty());
     CHECK(restored[2]->connector_facets.get_triangle_as_string(0).empty());
-    CHECK(restored[2]->connector_facets.get_triangle_as_string(1) == "1");
-    CHECK(restored[3]->connector_facets.get_triangle_as_string(0) == "1");
+    CHECK(restored[2]->connector_facets.get_triangle_as_string(1) == "4");
+    CHECK(restored[3]->connector_facets.get_triangle_as_string(0) == "4");
     for (size_t i = 4; i < restored.size(); ++i)
         CHECK(restored[i]->connector_facets.get_triangle_as_string(0).empty());
     CHECK(destination.model.is_connector_painted());

@@ -1192,7 +1192,14 @@ REM echo_var <variable>
 	exit /b 0
 
 	:vs_path_found
-	call "%VS_PATH%\Common7\Tools\VsDevCmd.bat" -arch=!dev_arch! >nul 2>nul
+	REM MSVC 14.52.37025 on the windows-11-vs2026-arm image has a reproducible
+	REM ARM64 C1001 compiler crash. Prefer the known-good 14.44 toolset when
+	REM that side-by-side installation is available; leave x64 and other images
+	REM on their normal default toolset.
+	set "vcvars_toolset="
+	if /I "!arch!"=="ARM64" if exist "!VS_PATH!\VC\Tools\MSVC\14.44.35207\." set "vcvars_toolset=-vcvars_ver=14.44"
+	if defined vcvars_toolset echo Using stable ARM64 MSVC toolset 14.44.
+	call "%VS_PATH%\Common7\Tools\VsDevCmd.bat" -arch=!dev_arch! !vcvars_toolset! >nul 2>nul
 	set "VS_PATH="
 
 	exit /b 0

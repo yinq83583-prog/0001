@@ -4,6 +4,7 @@
 #include "Circle.hpp"
 #include "Config.hpp"
 #include "GCode/GCodeProcessor.hpp"
+#include "GCode/LayerTimeSmooth.hpp"
 #include "Flow.hpp"
 #include "GCode/ThumbnailData.hpp"
 #include "GCode/ToolOrdering.hpp"
@@ -71,6 +72,7 @@
 #include <iomanip>
 #include <cstring>
 #include <exception>
+#include <boost/nowide/fstream.hpp>
 #include <functional>
 #include <iostream>
 #include <iterator>
@@ -2963,6 +2965,66 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
         throw;
     }
     file.close();
+
+    // Optional native Layer Time Smooth pass. The temporary G-code is rewritten
+    // first, then replayed through the native processor so statistics and preview
+    // moves correspond to the exact feedrates that will be exported.
+    if (print->config().layer_time_smooth.value) {
+        boost::nowide::ifstream input(path_tmp.c_str(), std::ios::binary);
+        if (!input)
+            throw Slic3r::RuntimeError("Layer Time Smooth could not read the temporary G-code file.");
+        std::ostringstream input_buffer;
+        input_buffer << input.rdbuf();
+        input.close();
+        std::string gcode = input_buffer.str();
+
+        GCodeSmoothing::LayerTimeSmoothConfig smooth;
+        smooth.enabled = true;
+        smooth.max_layer_variation_percent = print->config().layer_time_smooth_max_variation.value;
+        smooth.max_slowdown_percent = print->config().layer_time_smooth_max_slowdown.value;
+        smooth.min_speed_mm_s = print->config().layer_time_smooth_min_speed.value;
+        smooth.max_total_time_increase_percent = print->config().layer_time_smooth_max_time_increase.value;
+        smooth.smooth_radius = print->config().layer_time_smooth_smoothing_radius.value;
+        smooth.quality_speed = print->config().layer_time_smooth_quality_speed.value;
+        smooth.preserve_outer_walls = print->config().layer_time_smooth_preserve_outer_walls.value;
+        smooth.adjust_inner_walls = print->config().layer_time_smooth_adjust_inner_walls.value;
+        smooth.adjust_infill = print->config().layer_time_smooth_adjust_infill.value;
+        smooth.adjust_top_surface = print->config().layer_time_smooth_adjust_top_surface.value;
+        smooth.adjust_support = print->config().layer_time_smooth_adjust_support.value;
+        smooth.adjust_bridges = print->config().layer_time_smooth_adjust_bridges.value;
+        smooth.adjust_gap_fill = print->config().layer_time_smooth_adjust_gap_fill.value;
+        smooth.write_layer_report = print->config().layer_time_smooth_write_layer_report.value;
+        smooth.keep_min_speed = print->config().layer_time_smooth_keep_min_speed.value;
+        smooth.manual_profile.assign(print->config().layer_time_smooth_manual_profile.values.begin(),
+                                     print->config().layer_time_smooth_manual_profile.values.end());
+        smooth.manual_profile = print->config().layer_time_smooth_manual_profile.values;
+
+        GCodeSmoothing::LayerTimeSmoothReport smooth_report;
+        if (GCodeSmoothing::LayerTimeSmooth::process(gcode, smooth, &smooth_report)) {
+            boost::nowide::ofstream output(path_tmp.c_str(), std::ios::binary | std::ios::trunc);
+            if (!output)
+                throw Slic3r::RuntimeError("Layer Time Smooth could not rewrite the temporary G-code file.");
+            output.write(gcode.data(), static_cast<std::streamsize>(gcode.size()));
+            output.close();
+            if (!output)
+                throw Slic3r::RuntimeError("Layer Time Smooth failed while writing the temporary G-code file.");
+
+            m_processor.reset();
+            m_processor.initialize_from_context(print->get_layered_nozzle_group_result());
+            m_processor.initialize_result_moves();
+            m_processor.apply_config(print->config());
+            m_processor.configure_exclusion_volume_path_check(print->config());
+            m_processor.set_print(print);
+            set_mass_locator(m_processor, *print);
+            m_processor.initialize(path_tmp);
+            m_processor.process_buffer(gcode, true);
+            BOOST_LOG_TRIVIAL(info) << "Layer Time Smooth: " << smooth_report.message
+                                    << " layers=" << smooth_report.layers
+                                    << " adjusted_moves=" << smooth_report.changed_moves;
+        } else {
+            BOOST_LOG_TRIVIAL(info) << "Layer Time Smooth skipped: " << smooth_report.message;
+        }
+    }
 
     check_placeholder_parser_failed();
 

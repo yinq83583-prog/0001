@@ -404,7 +404,7 @@ TEST_CASE("Painted Surface Connector annotations survive BBS split-model 3MF rou
     Archive archive = read_archive(file.string());
     CHECK(std::any_of(archive.begin(), archive.end(), [](const auto &entry) {
         return entry.first.find("3D/Objects/") == 0 &&
-               entry.second.find("paint_connector=\"1\"") != std::string::npos;
+               entry.second.find("paint_connector=\"4\"") != std::string::npos;
     }));
 
     Scene destination;
@@ -445,7 +445,7 @@ TEST_CASE("Painted Surface Connector annotations survive BBS and Prusa 3MF round
         [](const auto &entry) { return entry.first == "3D/3dmodel.model"; });
     REQUIRE(model_file != archive.end());
     const std::string connector_attribute = backend == Backend::Bbs ?
-        "paint_connector=\"1\"" : "slic3rpe:connector_painting=\"1\"";
+        "paint_connector=\"4\"" : "slic3rpe:connector_painting=\"4\"";
     CHECK(model_file->second.find(connector_attribute) != std::string::npos);
     if (backend == Backend::Prusa)
         CHECK(model_file->second.find("name=\"slic3rpe:ConnectorPaintingVersion\">1</") != std::string::npos);

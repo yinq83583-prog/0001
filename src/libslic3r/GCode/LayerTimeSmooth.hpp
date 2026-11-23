@@ -39,6 +39,11 @@ struct LayerTimeSmoothReport {
     std::size_t restored_moves = 0;
     double time_before = 0.0;
     double time_after = 0.0;
+    // Estimated seconds by physical layer, corresponding to layer markers
+    // in the final exported G-code. Travel and non-extrusion motion are
+    // included; controller pauses and hardware acceleration are estimates.
+    std::vector<double> time_before_per_layer;
+    std::vector<double> time_after_per_layer;
     double max_jump_before = 0.0;
     double max_jump_after = 0.0;
     double effective_layer_ratio = 0.0;

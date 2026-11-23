@@ -4,6 +4,7 @@
 #include <string>
 #include <sstream>
 #include <iomanip>
+#include <exception>
 #include <imgui.h>
 #include <wx/event.h>
 #include "slic3r/GUI/Event.hpp"
@@ -7840,7 +7841,7 @@ bool GLCanvas3D::_init_main_toolbar()
     };
     item.right.toggable = false;
     item.right.render_callback = GLToolbarItem::Default_Render_Callback;
-    item.visibility_callback = []()->bool { return current_printer_technology() == ptFFF; };
+    item.visibility_callback = [this]()->bool { return current_printer_technology() == ptFFF; };
     item.enabling_callback = []()->bool { return wxGetApp().get_tab(Preset::TYPE_PRINT) != nullptr; };
     if (!m_main_toolbar.add_item(item))
         return false;

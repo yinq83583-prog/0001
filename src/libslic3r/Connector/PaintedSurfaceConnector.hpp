@@ -20,6 +20,8 @@ struct ConnectorOptions {
     double fit_gap_mm=0.15;
     double bed_z_mm=0.0;
     double min_height_mm=0.25;
+    // Radial XY expansion of the build-plate footprint (mm).
+    double bed_flare_mm=1.2;
     double max_bridge_distance_mm=25.0;
     double max_bridge_area_ratio=2.5;
     // Future native bridge generation uses distinct facing regions.

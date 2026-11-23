@@ -83,6 +83,16 @@ int main() {
     assert(connected_painted_regions(separate).size()==2);
     assert(generate_downward_connectors(separate).downward_connectors==2);
     assert(generate_downward_connectors({}).triangles.empty());
+    // A zero-area painted facet touching two patches must not merge their regions.
+    // The source triangles remain separate printable islands despite the stray facet.
+    const std::vector<Triangle> degenerate_link={
+        {{0,0,5},{10,0,5},{0,10,5}},
+        {{20,0,5},{30,0,5},{20,10,5}},
+        {{10,0,5},{20,0,5},{20,0,5}}
+    };
+    assert(connected_painted_regions(degenerate_link).size()==2);
+    assert(generate_downward_connectors(degenerate_link).downward_connectors==2);
+
     const std::vector<Triangle> facing={
         {{0,0,3},{10,0,3},{0,10,3}},
         {{0,0,8},{0,10,8},{10,0,8}}

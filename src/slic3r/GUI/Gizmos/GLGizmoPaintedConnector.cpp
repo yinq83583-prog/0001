@@ -330,6 +330,8 @@ void GLGizmoPaintedConnector::on_render_input_window(float x, float y, float bot
     ImGui::DragFloat("Fit gap (mm)##connector", &m_connector_fit_gap_mm, 0.01f, 0.0f, 5.0f, "%.2f");
     ImGui::SameLine();
     ImGui::DragFloat("Max bridge (mm)##connector", &m_connector_bridge_distance_mm, 0.5f, 0.0f, 200.0f, "%.1f");
+    ImGui::SameLine();
+    ImGui::DragFloat("Bed flare (mm)##connector", &m_connector_bed_flare_mm, 0.05f, 0.0f, 10.0f, "%.2f");
     ImGui::PopItemWidth();
 
     const bool has_generated_connectors = std::any_of(mo->volumes.begin(), mo->volumes.end(),
@@ -463,6 +465,7 @@ void GLGizmoPaintedConnector::generate_connectors()
 
     Slic3r::Connector::ConnectorOptions options;
     options.fit_gap_mm = m_connector_fit_gap_mm;
+    options.bed_flare_mm = m_connector_bed_flare_mm;
     options.max_bridge_distance_mm = m_connector_bridge_distance_mm;
     const Slic3r::Connector::ConnectorResult generated =
         Slic3r::Connector::generate_connectors(painted, options);

@@ -720,6 +720,21 @@ bool LayerTimeSmooth::process(
     for (double& value : config.manual_profile)
         value = clampv(value, 0.0, 1.0);
 
+    // G93 and G95 change the physical meaning of F (inverse-time or
+    // units/revolution). Rewriting these as mm/min could cause unsafe motion.
+    // Refuse the entire file, even if G94 appears later, until the pipeline
+    // explicitly models transitions between feed modes.
+    {
+        std::istringstream safety_input(gcode);
+        std::string safety_line;
+        while (std::getline(safety_input, safety_line)) {
+            const std::string mode = command(code_part(safety_line));
+            if (mode == "G93" || mode == "G95")
+                return finish(LayerTimeSmoothReport::Status::Failed,
+                    "Unsupported G93/G95 feedrate mode; G-code left unchanged.");
+        }
+    }
+
     const bool trailing_newline = !gcode.empty() && gcode.back() == '\n';
     std::vector<std::string> lines;
     std::istringstream input_stream(gcode);
@@ -741,6 +756,18 @@ bool LayerTimeSmooth::process(
     const Analysis after = analyze_gcode(rewritten.lines, config);
     const double total_before = sum_values(before.times);
     const double total_after = sum_values(after.times);
+    // Validate *rewritten* F words, not only theoretical layer targets.
+    // Rounding and modal-feed restores must not silently exceed the configured
+    // whole-print time budget. Reject on an unsafe estimate without modifying
+    // the original G-code.
+    const double budget_limit = total_before *
+        (1.0 + config.max_total_time_increase_percent / 100.0);
+    if (after.spans.size() != before.spans.size() ||
+        !std::isfinite(total_before) || !std::isfinite(total_after) ||
+        total_before <= 0.0 ||
+        total_after > budget_limit + std::max(0.01, total_before * 1e-6))
+        return finish(LayerTimeSmoothReport::Status::Failed,
+            "Rewritten feedrates failed the layer-count or total-time budget check; G-code unchanged.");
     result.layers = before.spans.size();
     result.changed_moves = rewritten.changed_moves;
     result.restored_moves = rewritten.restored_moves;

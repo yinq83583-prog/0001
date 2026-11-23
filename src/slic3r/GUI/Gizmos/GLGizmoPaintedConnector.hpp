@@ -50,6 +50,7 @@ private:
 
     // Native extraction controls; geometry and preview use the same options.
     float m_connector_fit_gap_mm = 0.15f;
+    float m_connector_bed_flare_mm = 1.2f;
     float m_connector_bridge_distance_mm = 25.0f;
 
     void             on_opening() override {}

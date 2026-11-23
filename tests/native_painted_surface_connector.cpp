@@ -59,6 +59,25 @@ int main() {
         if(close(f.a.z,0)&&close(f.b.z,0)&&close(f.c.z,0))bottom=true;
     assert(bottom);
 
+    // A positive bed flare widens the footprint without opening the shell.
+    ConnectorOptions no_flare;
+    no_flare.bed_flare_mm = 0.0;
+    const auto straight = generate_downward_connectors(patch, no_flare);
+    ConnectorOptions with_flare;
+    with_flare.bed_flare_mm = 1.2;
+    const auto widened = generate_downward_connectors(patch, with_flare);
+    assert(straight.downward_connectors == 1);
+    assert(widened.downward_connectors == 1);
+    assert(is_closed_manifold(widened.triangles));
+    double straight_min_x = 1e9, widened_min_x = 1e9;
+    for (const Triangle& t : straight.triangles)
+        for (const Vec3 v : {t.a, t.b, t.c})
+            if (close(v.z, 0.0)) straight_min_x = std::min(straight_min_x, v.x);
+    for (const Triangle& t : widened.triangles)
+        for (const Vec3 v : {t.a, t.b, t.c})
+            if (close(v.z, 0.0)) widened_min_x = std::min(widened_min_x, v.x);
+    assert(widened_min_x < straight_min_x - 0.5);
+
     std::vector<Triangle> separate=patch;
     separate.push_back({{20,0,6},{30,0,6},{20,10,6}});
     assert(connected_painted_regions(separate).size()==2);

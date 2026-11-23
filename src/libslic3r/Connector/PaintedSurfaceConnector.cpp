@@ -150,14 +150,26 @@ ConnectorResult generate_downward_connectors(const std::vector<Triangle>& painte
             }
         }
         const VertexOffsets offsets = local_offsets(r, gap);
+        const double flare = std::max(0.0, options.bed_flare_mm);
+        // A shared radial mapping keeps the cap and boundary wall vertices
+        // identical, avoiding cracks along the widened build-plate footprint.
+        const auto on_bed = [&](Vec3 v) {
+            const double dx = v.x - r.center.x;
+            const double dy = v.y - r.center.y;
+            const double radius = std::hypot(dx, dy);
+            if (radius > 1e-9) {
+                v.x += flare * dx / radius;
+                v.y += flare * dy / radius;
+            }
+            v.z = options.bed_z_mm;
+            return v;
+        };
         std::vector<Triangle> candidate;
         // Conformal cap: preserve the actual painted triangles and their winding.
         for(const Triangle& t:r.facets){
             const Triangle top{displaced(t.a,offsets),displaced(t.b,offsets),displaced(t.c,offsets)};
             add_triangle_if_valid(candidate,top.a,top.b,top.c);
-            Triangle bottom=top;
-            bottom.a.z=options.bed_z_mm;bottom.b.z=options.bed_z_mm;bottom.c.z=options.bed_z_mm;
-            std::swap(bottom.b,bottom.c);
+            Triangle bottom{on_bed(top.a), on_bed(top.c), on_bed(top.b)};
             if(len(cross(sub(bottom.b,bottom.a),sub(bottom.c,bottom.a)))>1e-12)
                 candidate.push_back(bottom);
         }
@@ -165,7 +177,7 @@ ConnectorResult generate_downward_connectors(const std::vector<Triangle>& painte
         for(const auto& item:borders){
             if(duplicate.count(item.first))continue;
             Vec3 a=displaced(item.second.first,offsets),b=displaced(item.second.second,offsets);
-            Vec3 c=b,d=a;c.z=options.bed_z_mm;d.z=options.bed_z_mm;
+            const Vec3 c=on_bed(b), d=on_bed(a);
             add_quad(candidate,b,a,d,c);
         }
         if (!is_closed_oriented_volume(candidate)) {

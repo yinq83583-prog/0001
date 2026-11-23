@@ -463,4 +463,21 @@ TEST_CASE("Painted Surface Connector annotations survive BBS and Prusa 3MF round
     for (size_t i = 4; i < restored.size(); ++i)
         CHECK(restored[i]->connector_facets.get_triangle_as_string(0).empty());
     CHECK(destination.model.is_connector_painted());
+
+    // A second export/import must not discard masks or merge distinct masks on shared meshes.
+    destination.share_mesh = shared;
+    ScopedTemporaryFile resaved_file(".3mf");
+    save(resaved_file.string(), backend, destination);
+    Scene reloaded;
+    load(resaved_file.string(), backend, reloaded);
+    REQUIRE(reloaded.model.objects.size() == 1);
+    REQUIRE(reloaded.model.objects.front()->volumes.size() == 7);
+    const auto &round_two = reloaded.model.objects.front()->volumes;
+    for (size_t i = 0; i < restored.size(); ++i) {
+        REQUIRE(round_two[i]->mesh().its.indices.size() == restored[i]->mesh().its.indices.size());
+        for (size_t triangle = 0; triangle < restored[i]->mesh().its.indices.size(); ++triangle)
+            CHECK(round_two[i]->connector_facets.get_triangle_as_string(triangle) ==
+                  restored[i]->connector_facets.get_triangle_as_string(triangle));
+    }
+    CHECK(reloaded.model.is_connector_painted());
 }

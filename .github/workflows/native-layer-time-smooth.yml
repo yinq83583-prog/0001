@@ -23,6 +23,12 @@ jobs:
             src/libslic3r/GCode/LayerTimeSmooth.cpp \
             tests/native_layer_time_smooth.cpp \
             -o build-native-tests/layer_time_smooth_test
+      - name: Compile layer time smooth safety and feature tests
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -O2 \
+            src/libslic3r/GCode/LayerTimeSmooth.cpp \
+            tests/native_layer_time_smooth_safety.cpp \
+            -o build-native-tests/layer_time_smooth_safety_test
       - name: Compile painted connector geometry tests
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror -O2 \
@@ -32,4 +38,5 @@ jobs:
       - name: Execute native tests
         run: |
           build-native-tests/layer_time_smooth_test
+          build-native-tests/layer_time_smooth_safety_test
           build-native-tests/painted_connector_test

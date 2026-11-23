@@ -140,6 +140,17 @@ ConnectorResult generate_downward_connectors(const std::vector<Triangle>& painte
         if(min_z<=options.bed_z_mm+std::max(0.0,options.min_height_mm)){
             ++result.skipped_regions;continue;
         }
+        // A vertical or edge-on mask has no build-plate footprint. Radial
+        // flare must not manufacture an artificial footprint for it.
+        // Test the original triangles before any local-normal displacement
+        // or bed flare, since those operations can hide this degeneracy.
+        double projected_area_twice = 0.0;
+        for (const Triangle& t : r.facets)
+            projected_area_twice += std::abs(cross(sub(t.b, t.a), sub(t.c, t.a)).z);
+        if (projected_area_twice <= 1e-10) {
+            ++result.skipped_regions;
+            continue;
+        }
         std::map<Edge,std::pair<Vec3,Vec3>> borders;
         std::set<Edge> duplicate;
         for(const Triangle& t:r.facets){

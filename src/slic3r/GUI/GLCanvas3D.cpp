@@ -7623,6 +7623,10 @@ void GLCanvas3D::_switch_toolbars_icon_filename()
 
         item = m_main_toolbar.get_item("layersediting");
         item->set_icon_filename(m_is_dark ? "toolbar_variable_layer_height_dark.svg" : "toolbar_variable_layer_height.svg");
+
+        // Keep the new Layer Time Smooth icon in sync with theme changes.
+        item = m_main_toolbar.get_item("layer_time_smooth");
+        item->set_icon_filename(m_is_dark ? "toolbar_layer_time_smooth_dark.svg" : "toolbar_layer_time_smooth.svg");
     }
 
     // assemble view toolbar

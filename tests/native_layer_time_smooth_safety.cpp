@@ -84,10 +84,24 @@ int main() {
     assert(report.changed_moves > 0);
     assert(report.time_after >= report.time_before);
     assert(report.time_after <= report.time_before * 1.50 + 0.01);
+    assert(report.time_before_per_layer.size() == 3);
+    assert(report.time_after_per_layer.size() == 3);
+    assert(gcode.find("; LTS_V5_LAYER_INDEX=0 TIME_BEFORE_S=") != std::string::npos);
+    assert(gcode.find("; LTS_V5_LAYER_INDEX=1 TIME_BEFORE_S=") != std::string::npos);
+    assert(gcode.find("; LTS_V5_LAYER_INDEX=2 TIME_BEFORE_S=") != std::string::npos);
     const std::string processed = gcode;
     assert(!LayerTimeSmooth::process(gcode, c, &report));
     assert(report.status == LayerTimeSmoothReport::Status::AlreadyProcessed);
     assert(gcode == processed);
+
+    // A user can suppress line-by-line reports without disabling smoothing.
+    c.write_layer_report = false;
+    std::string no_report = layers("Inner wall");
+    assert(LayerTimeSmooth::process(no_report, c, &report));
+    assert(no_report.find("LTS_V5_LAYER_INDEX") == std::string::npos);
+    assert(no_report.find("LTS_V5_ESTIMATED_TIME_BEFORE") == std::string::npos);
+    assert(no_report.find("LAYER_TIME_SMOOTH_V5_PROCESSED") != std::string::npos);
+    c.write_layer_report = true;
 
     // Feed mode G93 (inverse-time) or G95 (per-revolution) is unsafe to
     // interpret as mm/min. Such input must remain byte-for-byte untouched.

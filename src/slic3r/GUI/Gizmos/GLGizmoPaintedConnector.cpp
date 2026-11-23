@@ -325,6 +325,13 @@ void GLGizmoPaintedConnector::on_render_input_window(float x, float y, float bot
     m_imgui->disabled_end();
 
     ImGui::SameLine();
+    // Parameters apply to the native C++ geometry generator, not a Python host.
+    ImGui::PushItemWidth(115.0f);
+    ImGui::DragFloat("Fit gap (mm)##connector", &m_connector_fit_gap_mm, 0.01f, 0.0f, 5.0f, "%.2f");
+    ImGui::SameLine();
+    ImGui::DragFloat("Max bridge (mm)##connector", &m_connector_bridge_distance_mm, 0.5f, 0.0f, 200.0f, "%.1f");
+    ImGui::PopItemWidth();
+
     const bool has_generated_connectors = std::any_of(mo->volumes.begin(), mo->volumes.end(),
         [](const ModelVolume* volume) { return is_generated_connector_volume(volume); });
     m_imgui->disabled_begin(!mo->is_connector_painted() || mo->instances.size() != 1 || m_parent.get_canvas_type() == GLCanvas3D::CanvasAssembleView);
@@ -454,8 +461,11 @@ void GLGizmoPaintedConnector::generate_connectors()
         return;
     }
 
+    Slic3r::Connector::ConnectorOptions options;
+    options.fit_gap_mm = m_connector_fit_gap_mm;
+    options.max_bridge_distance_mm = m_connector_bridge_distance_mm;
     const Slic3r::Connector::ConnectorResult generated =
-        Slic3r::Connector::generate_connectors(painted);
+        Slic3r::Connector::generate_connectors(painted, options);
     if (generated.triangles.empty()) {
         wxMessageBox(_L("No printable connector could be generated from the painted regions. Check the selected surfaces and their orientation."),
                      _L("Painted Surface Connector"), wxOK | wxICON_WARNING, wxGetApp().GetTopWindow());

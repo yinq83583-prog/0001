@@ -327,17 +327,26 @@ void GLGizmoPaintedConnector::on_render_input_window(float x, float y, float bot
     ImGui::SameLine();
     // Parameters apply to the native C++ geometry generator, not a Python host.
     ImGui::PushItemWidth(115.0f);
+    // Rebuild only after the user releases an edited control. Avoid expensive
+    // mesh generation and undo snapshots on every intermediate drag frame.
+    bool connector_options_committed = false;
     ImGui::DragFloat("Fit gap (mm)##connector", &m_connector_fit_gap_mm, 0.01f, 0.0f, 5.0f, "%.2f");
+    connector_options_committed |= ImGui::IsItemDeactivatedAfterEdit();
     ImGui::SameLine();
     ImGui::DragFloat("Max bridge (mm)##connector", &m_connector_bridge_distance_mm, 0.5f, 0.0f, 200.0f, "%.1f");
+    connector_options_committed |= ImGui::IsItemDeactivatedAfterEdit();
     ImGui::SameLine();
     ImGui::DragFloat("Bed flare (mm)##connector", &m_connector_bed_flare_mm, 0.05f, 0.0f, 10.0f, "%.2f");
+    connector_options_committed |= ImGui::IsItemDeactivatedAfterEdit();
     ImGui::PopItemWidth();
 
     const bool has_generated_connectors = std::any_of(mo->volumes.begin(), mo->volumes.end(),
         [](const ModelVolume* volume) { return is_generated_connector_volume(volume); });
-    m_imgui->disabled_begin(!mo->is_connector_painted() || mo->instances.size() != 1 || m_parent.get_canvas_type() == GLCanvas3D::CanvasAssembleView);
-    if (m_imgui->button(has_generated_connectors ? _L("Regenerate connectors") : _L("Generate connectors")))
+    const bool can_generate_connectors = mo->is_connector_painted() && mo->instances.size() == 1 &&
+        m_parent.get_canvas_type() != GLCanvas3D::CanvasAssembleView;
+    m_imgui->disabled_begin(!can_generate_connectors);
+    const bool generate_clicked = m_imgui->button(has_generated_connectors ? _L("Regenerate connectors") : _L("Generate connectors"));
+    if (can_generate_connectors && (generate_clicked || (has_generated_connectors && connector_options_committed)))
         generate_connectors();
     m_imgui->disabled_end();
 

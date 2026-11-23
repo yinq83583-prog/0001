@@ -48,6 +48,14 @@ private:
     bool is_paintable_volume(const ModelVolume* volume) const override;
     void generate_connectors();
 
+    // Independent ZBrush-like mask extraction. Keep bridge/down-to-bed as the
+    // default mode to preserve existing connector-paint project behavior.
+    bool m_extract_surface = false;
+    bool m_extract_double_sided = false;
+    float m_extract_thickness_mm = 1.2f;
+    float m_extract_fit_gap_mm = 0.15f;
+    float m_extract_smooth_boundary = 0.0f;
+
     void             on_opening() override {}
     void             on_shutdown() override;
     PainterGizmoType get_painter_type() const override;

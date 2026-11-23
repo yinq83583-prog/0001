@@ -104,6 +104,29 @@ std::vector<Region> connected_painted_regions(const std::vector<Triangle>& paint
     }
     return result;
 }
+// Area-weighted vertex normals retain the painted patch's local curvature.
+// Quantized vertex keys are shared with boundary extraction, ensuring caps
+// and walls use identical positions (no cracks along shared edges).
+namespace {
+using VertexOffsets = std::map<Key, Vec3>;
+VertexOffsets local_offsets(const Region& region, double gap) {
+    VertexOffsets normals;
+    for (const Triangle& t : region.facets) {
+        const Vec3 n = cross(sub(t.b, t.a), sub(t.c, t.a));
+        for (const Vec3 v : {t.a, t.b, t.c})
+            normals[key(v)] = add(normals[key(v)], n);
+    }
+    for (auto& item : normals) {
+        const Vec3 n = unit(item.second);
+        item.second = mul(len(n) > 0.0 ? n : region.normal, gap);
+    }
+    return normals;
+}
+Vec3 displaced(Vec3 v, const VertexOffsets& offsets) {
+    const auto it = offsets.find(key(v));
+    return it == offsets.end() ? v : add(v, it->second);
+}
+}
 ConnectorResult generate_downward_connectors(const std::vector<Triangle>& painted,
     const ConnectorOptions& options) {
     ConnectorResult result;
@@ -126,11 +149,11 @@ ConnectorResult generate_downward_connectors(const std::vector<Triangle>& painte
                 else borders.emplace(e,std::make_pair(a,b));
             }
         }
-        const Vec3 offset=mul(r.normal,gap);
+        const VertexOffsets offsets = local_offsets(r, gap);
         std::vector<Triangle> candidate;
         // Conformal cap: preserve the actual painted triangles and their winding.
         for(const Triangle& t:r.facets){
-            const Triangle top{add(t.a,offset),add(t.b,offset),add(t.c,offset)};
+            const Triangle top{displaced(t.a,offsets),displaced(t.b,offsets),displaced(t.c,offsets)};
             add_triangle_if_valid(candidate,top.a,top.b,top.c);
             Triangle bottom=top;
             bottom.a.z=options.bed_z_mm;bottom.b.z=options.bed_z_mm;bottom.c.z=options.bed_z_mm;
@@ -141,7 +164,7 @@ ConnectorResult generate_downward_connectors(const std::vector<Triangle>& painte
         // Only boundary edges receive walls; shared triangle edges are internal.
         for(const auto& item:borders){
             if(duplicate.count(item.first))continue;
-            Vec3 a=add(item.second.first,offset),b=add(item.second.second,offset);
+            Vec3 a=displaced(item.second.first,offsets),b=displaced(item.second.second,offsets);
             Vec3 c=b,d=a;c.z=options.bed_z_mm;d.z=options.bed_z_mm;
             add_quad(candidate,b,a,d,c);
         }
@@ -187,11 +210,11 @@ bool get_boundary(const Region& region,std::vector<Vec3>& loop) {
     }
     return false;
 }
-void append_cap(std::vector<Triangle>& dst,const Region& region,Vec3 offset) {
+void append_cap(std::vector<Triangle>& dst,const Region& region,const VertexOffsets& offsets) {
     // The painted source normals point into the gap, hence reverse
     // them when using those patches as the outer caps of the connector.
     for(const Triangle& tri:region.facets)
-        dst.push_back({add(tri.a,offset),add(tri.c,offset),add(tri.b,offset)});
+        dst.push_back({displaced(tri.a,offsets),displaced(tri.c,offsets),displaced(tri.b,offsets)});
 }
 std::vector<double> normalized_loop_fractions(const std::vector<Vec3>& loop) {
     std::vector<double> fractions(loop.size()+1,0.0);
@@ -256,9 +279,10 @@ bool bridge_regions(const Region& a,const Region& b,double gap,std::vector<Trian
     if(matched_loop.size()!=bb.size())return false;
     bb=std::move(matched_loop);
 
-    const Vec3 oa=mul(a.normal,gap),ob=mul(b.normal,gap);
-    for(auto& v:aa)v=add(v,oa);
-    for(auto& v:bb)v=add(v,ob);
+    const VertexOffsets offsets_a = local_offsets(a, gap);
+    const VertexOffsets offsets_b = local_offsets(b, gap);
+    for(auto& v:aa)v=displaced(v,offsets_a);
+    for(auto& v:bb)v=displaced(v,offsets_b);
 
     const Vec3 axis=unit(sub(b.center,a.center));
     const Vec3 midcenter=mul(add(a.center,b.center),.5);
@@ -301,8 +325,8 @@ bool bridge_regions(const Region& a,const Region& b,double gap,std::vector<Trian
         }
     }
 
-    append_cap(out,a,oa);
-    append_cap(out,b,ob);
+    append_cap(out,a,offsets_a);
+    append_cap(out,b,offsets_b);
     return true;
 }
 }

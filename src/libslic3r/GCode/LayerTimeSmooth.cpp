@@ -773,6 +773,8 @@ bool LayerTimeSmooth::process(
     result.restored_moves = rewritten.restored_moves;
     result.time_before = total_before;
     result.time_after = total_after;
+    result.time_before_per_layer = before.times;
+    result.time_after_per_layer = after.times;
     result.max_jump_before = max_relative_jump(before.times);
     result.max_jump_after = max_relative_jump(after.times);
     result.effective_layer_ratio = scales.effective_ratio;
@@ -794,8 +796,31 @@ bool LayerTimeSmooth::process(
             << " CHANGED_EXTRUSION_MOVES=" << rewritten.changed_moves
             << " RESTORE_FEED_MOVES=" << rewritten.restored_moves << line_suffix;
     markers.push_back(details.str());
-    rewritten.lines.insert(rewritten.lines.begin() + static_cast<std::ptrdiff_t>(before.spans.front().begin),
-        markers.begin(), markers.end());
+    // Insert global metadata once and one record after each physical layer
+    // marker. Build the output in a single pass: repeated vector::insert in
+    // a multi-million-line G-code can become quadratic.
+    std::vector<std::string> annotated;
+    annotated.reserve(rewritten.lines.size() + markers.size() +
+        (config.write_layer_report ? before.spans.size() : 0));
+    std::size_t layer_index = 0;
+    for (std::size_t i = 0; i < rewritten.lines.size(); ++i) {
+        if (i == before.spans.front().begin)
+            annotated.insert(annotated.end(), markers.begin(), markers.end());
+        annotated.push_back(std::move(rewritten.lines[i]));
+        if (layer_index < before.spans.size() && i == before.spans[layer_index].begin) {
+            if (config.write_layer_report) {
+                std::ostringstream entry;
+                entry << "; LTS_V5_LAYER_INDEX=" << layer_index
+                      << " TIME_BEFORE_S=" << std::fixed << std::setprecision(2)
+                      << before.times[layer_index]
+                      << " TIME_AFTER_S=" << after.times[layer_index]
+                      << line_suffix;
+                annotated.push_back(entry.str());
+            }
+            ++layer_index;
+        }
+    }
+    rewritten.lines = std::move(annotated);
 
     std::ostringstream message;
     message << "V5.2.1 processed " << before.spans.size() << " layers; adjusted "

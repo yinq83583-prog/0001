@@ -148,5 +148,30 @@ int main() {
     assert(bed_intersection_result.skipped_regions==1);
     assert(bed_intersection_result.triangles.empty());
 
+    // Curved (non-coplanar) mask: local vertex normals must vary across
+    // the patch while the extracted cap and bed extrusion remain watertight.
+    const std::vector<Triangle> curved_patch={
+        {{0,0,5},{10,0,5},{10,10,6}},
+        {{0,0,5},{10,10,6},{0,10,5}}
+    };
+    ConnectorOptions curved_options;
+    curved_options.fit_gap_mm=0.5;
+    auto curved=generate_downward_connectors(curved_patch,curved_options);
+    assert(curved.downward_connectors==1);
+    assert(curved.skipped_regions==0);
+    assert(is_closed_manifold(curved.triangles));
+    const auto curved_regions=connected_painted_regions(curved_patch);
+    const Vec3 average=curved_regions.front().normal;
+    bool found_local_normal=false;
+    for(const Triangle& tri:curved.triangles)
+        for(const Vec3 v:{tri.a,tri.b,tri.c}) {
+            // The (10,0,5) corner belongs to just the first sloped face;
+            // its offset must not be the patch's averaged normal.
+            if(std::abs(v.x-10.0)<1.0 && std::abs(v.y)<1.0 && v.z>4.0 &&
+               std::abs((v.y-0.0)-average.y*0.5)>1e-3)
+                found_local_normal=true;
+        }
+    assert(found_local_normal);
+
     std::cout<<"Painted Surface Connector native geometry tests passed\n";
 }

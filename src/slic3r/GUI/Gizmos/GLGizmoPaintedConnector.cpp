@@ -34,6 +34,7 @@
 #include "slic3r/GUI/Event.hpp"
 #include <wx/busycursor.h>
 #include <wx/msgdlg.h>
+#include <wx/string.h> // wxOK and wxICON_* are used by wxMessageBox below.
 #include "libslic3r/Color.hpp"
 #include "slic3r/GUI/3DScene.hpp"
 #include <memory>

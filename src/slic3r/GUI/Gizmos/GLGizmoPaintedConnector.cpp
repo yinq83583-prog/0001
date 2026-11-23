@@ -33,6 +33,7 @@
 #include "libslic3r/Config.hpp"
 #include "slic3r/GUI/Event.hpp"
 #include <wx/busycursor.h>
+#include <wx/msgdlg.h>
 #include "libslic3r/Color.hpp"
 #include "slic3r/GUI/3DScene.hpp"
 #include <memory>
@@ -447,13 +448,19 @@ void GLGizmoPaintedConnector::generate_connectors()
         }
     }
 
-    if (painted.empty())
+    if (painted.empty()) {
+        wxMessageBox(_L("No connector-painted triangles were found. Paint a model surface before generating connectors."),
+                     _L("Painted Surface Connector"), wxOK | wxICON_INFORMATION, wxGetApp().GetTopWindow());
         return;
+    }
 
     const Slic3r::Connector::ConnectorResult generated =
         Slic3r::Connector::generate_connectors(painted);
-    if (generated.triangles.empty())
+    if (generated.triangles.empty()) {
+        wxMessageBox(_L("No printable connector could be generated from the painted regions. Check the selected surfaces and their orientation."),
+                     _L("Painted Surface Connector"), wxOK | wxICON_WARNING, wxGetApp().GetTopWindow());
         return;
+    }
 
     indexed_triangle_set connector_its;
     connector_its.vertices.reserve(generated.triangles.size() * 3);

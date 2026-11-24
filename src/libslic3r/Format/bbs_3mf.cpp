@@ -354,6 +354,8 @@ static constexpr const char* AUTO_DROP_ATTR = "auto_drop";
 static constexpr const char* INSTANCESCOUNT_ATTR = "instances_count";
 static constexpr const char* CUSTOM_SUPPORTS_ATTR = "paint_supports";
 static constexpr const char* CUSTOM_FUZZY_SKIN_ATTR  = "paint_fuzzy_skin";
+static constexpr const char* CUSTOM_CONNECTOR_PAINTING_ATTR = "paint_connector";
+static constexpr const char* PRUSA_CONNECTOR_PAINTING_ATTR = "slic3rpe:connector_painting";
 static constexpr const char* CUSTOM_SEAM_ATTR = "paint_seam";
 static constexpr const char* MMU_SEGMENTATION_ATTR = "paint_color";
 // Texture displacement. One paint mask per layer slot, mirroring paint_color; the layer stack itself is
@@ -856,6 +858,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
             std::vector<std::string> custom_seam;
             std::vector<std::string> mmu_segmentation;
             std::vector<std::string> fuzzy_skin;
+            std::vector<std::string> connector_painting;
             // One per texture displacement layer slot, indexed like `triangles` but stored only as far as the
             // slot's last painted triangle: empty when the slot has no paint, which is nearly every file.
             std::vector<std::string> texture_displacement[TEXTURE_DISPLACEMENT_MAX_LAYERS];
@@ -870,6 +873,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                 std::swap(triangles, o.triangles);
                 std::swap(custom_supports, o.custom_supports);
                 std::swap(custom_seam, o.custom_seam);
+                std::swap(connector_painting, o.connector_painting);
             }
 
             void reset() {
@@ -879,6 +883,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                 custom_seam.clear();
                 mmu_segmentation.clear();
                 fuzzy_skin.clear();
+                connector_painting.clear();
                 for (std::vector<std::string> &slot : texture_displacement)
                     slot.clear();
             }
@@ -4041,6 +4046,10 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
             m_curr_object->geometry.custom_seam.push_back(bbs_get_attribute_value_string(attributes, num_attributes, CUSTOM_SEAM_ATTR));
             m_curr_object->geometry.mmu_segmentation.push_back(bbs_get_attribute_value_string(attributes, num_attributes, MMU_SEGMENTATION_ATTR));
             m_curr_object->geometry.fuzzy_skin.push_back(bbs_get_attribute_value_string(attributes, num_attributes, CUSTOM_FUZZY_SKIN_ATTR));
+            std::string connector_painting = bbs_get_attribute_value_string(attributes, num_attributes, CUSTOM_CONNECTOR_PAINTING_ATTR);
+            if (connector_painting.empty())
+                connector_painting = bbs_get_attribute_value_string(attributes, num_attributes, PRUSA_CONNECTOR_PAINTING_ATTR);
+            m_curr_object->geometry.connector_painting.push_back(std::move(connector_painting));
             for (int slot = 0; slot < int(TEXTURE_DISPLACEMENT_MAX_LAYERS); ++slot)
                 if (const char *paint = bbs_get_attribute_value_charptr(attributes, num_attributes, TEXTURE_DISPLACEMENT_ATTRS[slot])) {
                     std::vector<std::string> &mask = m_curr_object->geometry.texture_displacement[slot];
@@ -5379,11 +5388,13 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                 volume->seam_facets.reserve(triangles_count);
                 volume->mmu_segmentation_facets.reserve(triangles_count);
                 volume->fuzzy_skin_facets.reserve(triangles_count);
+                volume->connector_facets.reserve(triangles_count);
                 for (size_t i=0; i<triangles_count; ++i) {
                     assert(i < sub_object->geometry.custom_supports.size());
                     assert(i < sub_object->geometry.custom_seam.size());
                     assert(i < sub_object->geometry.mmu_segmentation.size());
                     assert(i < sub_object->geometry.fuzzy_skin.size());
+                    assert(i < sub_object->geometry.connector_painting.size());
                     if (! sub_object->geometry.custom_supports[i].empty())
                         volume->supported_facets.set_triangle_from_string(i, sub_object->geometry.custom_supports[i]);
                     if (! sub_object->geometry.custom_seam[i].empty())
@@ -5392,6 +5403,8 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                         volume->mmu_segmentation_facets.set_triangle_from_string(i, sub_object->geometry.mmu_segmentation[i]);
                     if (!sub_object->geometry.fuzzy_skin[i].empty())
                         volume->fuzzy_skin_facets.set_triangle_from_string(i, sub_object->geometry.fuzzy_skin[i]);
+                    if (!sub_object->geometry.connector_painting[i].empty())
+                        volume->connector_facets.set_triangle_from_string(i, sub_object->geometry.connector_painting[i]);
                 }
                 volume->supported_facets.shrink_to_fit();
                 volume->seam_facets.shrink_to_fit();
@@ -5399,6 +5412,8 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                 volume->mmu_segmentation_facets.touch();
                 volume->fuzzy_skin_facets.shrink_to_fit();
                 volume->fuzzy_skin_facets.touch();
+                volume->connector_facets.shrink_to_fit();
+                volume->connector_facets.touch();
                 for (int slot = 0; slot < int(TEXTURE_DISPLACEMENT_MAX_LAYERS); ++slot) {
                     const std::vector<std::string> &mask = sub_object->geometry.texture_displacement[slot];
                     if (mask.empty())
@@ -5576,21 +5591,27 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
             volume->supported_facets.reserve(triangles_count);
             volume->seam_facets.reserve(triangles_count);
             volume->mmu_segmentation_facets.reserve(triangles_count);
+            volume->connector_facets.reserve(triangles_count);
             for (size_t i=0; i<triangles_count; ++i) {
                 size_t index = volume_data.first_triangle_id + i;
                 assert(index < geometry.custom_supports.size());
                 assert(index < geometry.custom_seam.size());
                 assert(index < geometry.mmu_segmentation.size());
+                assert(index < geometry.connector_painting.size());
                 if (! geometry.custom_supports[index].empty())
                     volume->supported_facets.set_triangle_from_string(i, geometry.custom_supports[index]);
                 if (! geometry.custom_seam[index].empty())
                     volume->seam_facets.set_triangle_from_string(i, geometry.custom_seam[index]);
                 if (! geometry.mmu_segmentation[index].empty())
                     volume->mmu_segmentation_facets.set_triangle_from_string(i, geometry.mmu_segmentation[index]);
+                if (! geometry.connector_painting[index].empty())
+                    volume->connector_facets.set_triangle_from_string(i, geometry.connector_painting[index]);
             }
             volume->supported_facets.shrink_to_fit();
             volume->seam_facets.shrink_to_fit();
             volume->mmu_segmentation_facets.shrink_to_fit();
+            volume->connector_facets.shrink_to_fit();
+            volume->connector_facets.touch();
 
             for (int slot = 0; slot < int(TEXTURE_DISPLACEMENT_MAX_LAYERS); ++slot) {
                 const std::vector<std::string> &mask = geometry.texture_displacement[slot];
@@ -5917,6 +5938,10 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
             current_object->geometry.custom_seam.push_back(bbs_get_attribute_value_string(attributes, num_attributes, CUSTOM_SEAM_ATTR));
             current_object->geometry.mmu_segmentation.push_back(bbs_get_attribute_value_string(attributes, num_attributes, MMU_SEGMENTATION_ATTR));
             current_object->geometry.fuzzy_skin.push_back(bbs_get_attribute_value_string(attributes, num_attributes, CUSTOM_FUZZY_SKIN_ATTR));
+            std::string connector_painting = bbs_get_attribute_value_string(attributes, num_attributes, CUSTOM_CONNECTOR_PAINTING_ATTR);
+            if (connector_painting.empty())
+                connector_painting = bbs_get_attribute_value_string(attributes, num_attributes, PRUSA_CONNECTOR_PAINTING_ATTR);
+            current_object->geometry.connector_painting.push_back(std::move(connector_painting));
             for (int slot = 0; slot < int(TEXTURE_DISPLACEMENT_MAX_LAYERS); ++slot)
                 if (const char *paint = bbs_get_attribute_value_charptr(attributes, num_attributes, TEXTURE_DISPLACEMENT_ATTRS[slot])) {
                     std::vector<std::string> &mask = current_object->geometry.texture_displacement[slot];
@@ -7380,6 +7405,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                                     && (shared_volume->seam_facets.equals(volume->seam_facets))
                                     && (shared_volume->mmu_segmentation_facets.equals(volume->mmu_segmentation_facets))
                                     && (shared_volume->fuzzy_skin_facets.equals(volume->fuzzy_skin_facets))
+                                    && (shared_volume->connector_facets.equals(volume->connector_facets))
                                     && same_texture_paint)
                                 {
                                     auto data = iter->second.first;
@@ -7793,6 +7819,15 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                     output_buffer += CUSTOM_FUZZY_SKIN_ATTR;
                     output_buffer += "=\"";
                     output_buffer += fuzzy_skin_painting_data_string;
+                    output_buffer += "\"";
+                }
+
+                std::string connector_painting_data_string = volume->connector_facets.get_triangle_as_string(i);
+                if (!connector_painting_data_string.empty()) {
+                    output_buffer += " ";
+                    output_buffer += CUSTOM_CONNECTOR_PAINTING_ATTR;
+                    output_buffer += "=\"";
+                    output_buffer += connector_painting_data_string;
                     output_buffer += "\"";
                 }
 

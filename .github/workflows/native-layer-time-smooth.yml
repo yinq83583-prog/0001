@@ -1,0 +1,42 @@
+name: Native connector and layer time smooth tests
+on:
+  pull_request:
+    branches:
+      - main
+      - release/*
+  workflow_dispatch:
+
+# Avoid duplicate push + pull_request runs for the same PR head.
+concurrency:
+  group: native-core-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  native-core:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile native C++ module and tests
+        run: |
+          mkdir -p build-native-tests
+          g++ -std=c++17 -Wall -Wextra -Werror -O2 \
+            src/libslic3r/GCode/LayerTimeSmooth.cpp \
+            tests/native_layer_time_smooth.cpp \
+            -o build-native-tests/layer_time_smooth_test
+      - name: Compile layer time smooth safety and feature tests
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -O2 \
+            src/libslic3r/GCode/LayerTimeSmooth.cpp \
+            tests/native_layer_time_smooth_safety.cpp \
+            -o build-native-tests/layer_time_smooth_safety_test
+      - name: Compile painted connector geometry tests
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -O2 \
+            src/libslic3r/Connector/PaintedSurfaceConnector.cpp \
+            tests/native_painted_surface_connector.cpp \
+            -o build-native-tests/painted_connector_test
+      - name: Execute native tests
+        run: |
+          build-native-tests/layer_time_smooth_test
+          build-native-tests/layer_time_smooth_safety_test
+          build-native-tests/painted_connector_test

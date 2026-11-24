@@ -3942,11 +3942,11 @@ void GCodeProcessor::initialize(const std::string& filename)
     m_result.id = ++s_result_id;
 }
 
-void GCodeProcessor::process_buffer(const std::string &buffer)
+void GCodeProcessor::process_buffer(const std::string &buffer, bool producers_enabled)
 {
     //FIXME maybe cache GCodeLine gline to be over multiple parse_buffer() invocations.
-    m_parser.parse_buffer(buffer, [this](GCodeReader&, const GCodeReader::GCodeLine& line) {
-        this->process_gcode_line(line, false);
+    m_parser.parse_buffer(buffer, [this, producers_enabled](GCodeReader&, const GCodeReader::GCodeLine& line) {
+        this->process_gcode_line(line, producers_enabled);
     });
 }
 

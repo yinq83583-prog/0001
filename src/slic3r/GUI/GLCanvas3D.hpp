@@ -662,6 +662,28 @@ private:
     GLGizmosManager m_gizmos;
     //BBS: GUI refactor: GLToolbar
     mutable GLToolbar m_main_toolbar;
+    // The Prepare toolbar's Layer Time Smooth popup edits the active process
+    // preset transactionally; it never writes an unrelated printer preset.
+    struct LayerTimeSmoothToolbarSettings {
+        bool enabled = false;
+        float max_variation = 25.0f;
+        float max_slowdown = 30.0f;
+        float min_speed = 18.0f;
+        float max_time_increase = 15.0f;
+        float smoothing_radius = 5.0f;
+        float strength = 0.5f;
+        bool preserve_outer_walls = true;
+        bool adjust_inner_walls = true;
+        bool adjust_infill = true;
+        bool adjust_top_surface = true;
+        bool adjust_support = false;
+        bool adjust_bridges = false;
+        bool adjust_gap_fill = false;
+        bool keep_min_speed = true;
+        bool write_layer_report = true;
+    };
+    LayerTimeSmoothToolbarSettings m_layer_time_smooth_settings;
+    std::string m_layer_time_smooth_error;
     mutable GLToolbar m_separator_toolbar;
     mutable IMToolbar m_sel_plate_toolbar;
     // Thumbnails of the plate switcher (Focus mode), refreshed when the plater's version changes.
@@ -1609,6 +1631,8 @@ private:
     //BBS: GUI refactor: adjust main toolbar position
     bool _render_orient_menu(float left, float right, float bottom, float top);
     void _render_arrange_menu(float left, float right, float bottom, float top);
+    void _load_layer_time_smooth_menu_settings();
+    void _render_layer_time_smooth_menu(float left, float right, float bottom, float top);
     void _render_3d_navigator();
 
     void _update_volumes_hover_state();

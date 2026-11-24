@@ -4,6 +4,7 @@
 #include <string>
 #include <sstream>
 #include <iomanip>
+#include <exception>
 #include <imgui.h>
 #include <wx/event.h>
 #include "slic3r/GUI/Event.hpp"
@@ -6688,6 +6689,142 @@ bool GLCanvas3D::_render_orient_menu(float left, float right, float bottom, floa
     return settings_changed;
 }
 
+// The Layer Time Smooth button lives next to Variable Layer Height on the
+// Prepare canvas top toolbar. Read the current edited process preset on opening
+// the popup; the values are not applied until the user presses Apply.
+void GLCanvas3D::_load_layer_time_smooth_menu_settings()
+{
+    m_layer_time_smooth_error.clear();
+    Tab* tab = wxGetApp().get_tab(Preset::TYPE_PRINT);
+    const DynamicPrintConfig* cfg = tab != nullptr ? tab->get_config() : nullptr;
+    if (cfg == nullptr) {
+        m_layer_time_smooth_error = "The process preset is unavailable.";
+        return;
+    }
+    LayerTimeSmoothToolbarSettings& ui = m_layer_time_smooth_settings;
+    const auto read_bool = [cfg](const char* key, bool& value) {
+        if (const auto* opt = cfg->option<ConfigOptionBool>(key))
+            value = opt->value;
+    };
+    const auto read_float = [cfg](const char* key, float& value) {
+        if (const auto* opt = cfg->option<ConfigOptionFloat>(key))
+            value = static_cast<float>(opt->value);
+    };
+    read_bool("layer_time_smooth", ui.enabled);
+    read_float("layer_time_smooth_max_variation", ui.max_variation);
+    read_float("layer_time_smooth_max_slowdown", ui.max_slowdown);
+    read_float("layer_time_smooth_min_speed", ui.min_speed);
+    read_float("layer_time_smooth_max_time_increase", ui.max_time_increase);
+    if (const auto* opt = cfg->option<ConfigOptionInt>("layer_time_smooth_smoothing_radius"))
+        ui.smoothing_radius = static_cast<float>(opt->value);
+    read_float("layer_time_smooth_quality_speed", ui.strength);
+    read_bool("layer_time_smooth_preserve_outer_walls", ui.preserve_outer_walls);
+    read_bool("layer_time_smooth_adjust_inner_walls", ui.adjust_inner_walls);
+    read_bool("layer_time_smooth_adjust_infill", ui.adjust_infill);
+    read_bool("layer_time_smooth_adjust_top_surface", ui.adjust_top_surface);
+    read_bool("layer_time_smooth_adjust_support", ui.adjust_support);
+    read_bool("layer_time_smooth_adjust_bridges", ui.adjust_bridges);
+    read_bool("layer_time_smooth_adjust_gap_fill", ui.adjust_gap_fill);
+    read_bool("layer_time_smooth_keep_min_speed", ui.keep_min_speed);
+    read_bool("layer_time_smooth_write_layer_report", ui.write_layer_report);
+}
+
+void GLCanvas3D::_render_layer_time_smooth_menu(float left, float right, float bottom, float top)
+{
+    (void)left; (void)right; (void)bottom;
+    ImGuiWrapper* imgui = wxGetApp().imgui();
+    const float canvas_w = float(get_canvas_size().get_width());
+#if BBS_TOOLBAR_ON_TOP
+    const float icon_left = m_main_toolbar.get_item("layer_time_smooth")->render_left_pos;
+    imgui->set_next_window_pos((1.0f + icon_left) * canvas_w / 2.0f,
+                               m_main_toolbar.get_height(), ImGuiCond_Always, 0.0f, 0.0f);
+#else
+    const float canvas_h = float(get_canvas_size().get_height());
+    const float x = canvas_w - m_main_toolbar.get_width();
+    const float y = 0.5f * canvas_h - top * float(wxGetApp().plater()->get_camera().get_zoom());
+    imgui->set_next_window_pos(x, y, ImGuiCond_Always, 1.0f, 0.0f);
+#endif
+    ImGuiWrapper::push_toolbar_style(get_scale());
+    imgui->begin(_L("Layer Time Smooth"),
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize |
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
+
+    LayerTimeSmoothToolbarSettings& ui = m_layer_time_smooth_settings;
+    imgui->text(_L("Layer Time Smooth"));
+    ImGui::Separator();
+    imgui->bbl_checkbox(_L("Enable layer time smoothing"), ui.enabled);
+    ImGui::PushItemWidth(imgui->scaled(10.0f));
+    imgui->text(_L("Adjacent-layer time change (%)"));
+    ImGui::SliderFloat("##lts_max_variation", &ui.max_variation, 0.0f, 100.0f, "%.1f");
+    imgui->text(_L("Maximum slowdown (%)"));
+    ImGui::SliderFloat("##lts_max_slowdown", &ui.max_slowdown, 0.0f, 70.0f, "%.1f");
+    imgui->text(_L("Minimum extrusion speed (mm/s)"));
+    ImGui::SliderFloat("##lts_min_speed", &ui.min_speed, 1.0f, 100.0f, "%.1f");
+    imgui->text(_L("Maximum total time increase (%)"));
+    ImGui::SliderFloat("##lts_total_time", &ui.max_time_increase, 0.0f, 50.0f, "%.1f");
+    imgui->text(_L("Smoothing radius (layers)"));
+    ImGui::SliderFloat("##lts_radius", &ui.smoothing_radius, 1.0f, 20.0f, "%.0f");
+    imgui->text(_L("Smoothing strength"));
+    ImGui::SliderFloat("##lts_strength", &ui.strength, 0.0f, 1.0f, "%.2f");
+    ImGui::PopItemWidth();
+
+    ImGui::Separator();
+    imgui->bbl_checkbox(_L("Preserve outer walls"), ui.preserve_outer_walls);
+    imgui->bbl_checkbox(_L("Adjust inner walls"), ui.adjust_inner_walls);
+    imgui->bbl_checkbox(_L("Adjust infill"), ui.adjust_infill);
+    imgui->bbl_checkbox(_L("Adjust top surfaces"), ui.adjust_top_surface);
+    if (ImGui::TreeNode("##lts_advanced", "%s", _u8L("Advanced feature protection").c_str())) {
+        imgui->bbl_checkbox(_L("Adjust supports"), ui.adjust_support);
+        imgui->bbl_checkbox(_L("Adjust bridges"), ui.adjust_bridges);
+        imgui->bbl_checkbox(_L("Adjust gap fill"), ui.adjust_gap_fill);
+        imgui->bbl_checkbox(_L("Enforce minimum speed"), ui.keep_min_speed);
+        imgui->bbl_checkbox(_L("Write per-layer time report"), ui.write_layer_report);
+        ImGui::TreePop();
+    }
+
+    ImGui::Separator();
+    if (imgui->button(_L("Apply"))) {
+        Tab* tab = wxGetApp().get_tab(Preset::TYPE_PRINT);
+        if (tab == nullptr) {
+            m_layer_time_smooth_error = "The process settings tab is unavailable.";
+        } else {
+            const auto number = [](float value) { return std::to_string(value); };
+            const auto boolean = [](bool value) { return value ? std::string("1") : std::string("0"); };
+            try {
+                tab->apply_preset_config_values({
+                    {"layer_time_smooth", boolean(ui.enabled)},
+                    {"layer_time_smooth_max_variation", number(ui.max_variation)},
+                    {"layer_time_smooth_max_slowdown", number(ui.max_slowdown)},
+                    {"layer_time_smooth_min_speed", number(ui.min_speed)},
+                    {"layer_time_smooth_max_time_increase", number(ui.max_time_increase)},
+                    {"layer_time_smooth_smoothing_radius", std::to_string(int(std::lround(ui.smoothing_radius)))},
+                    {"layer_time_smooth_quality_speed", number(ui.strength)},
+                    {"layer_time_smooth_preserve_outer_walls", boolean(ui.preserve_outer_walls)},
+                    {"layer_time_smooth_adjust_inner_walls", boolean(ui.adjust_inner_walls)},
+                    {"layer_time_smooth_adjust_infill", boolean(ui.adjust_infill)},
+                    {"layer_time_smooth_adjust_top_surface", boolean(ui.adjust_top_surface)},
+                    {"layer_time_smooth_adjust_support", boolean(ui.adjust_support)},
+                    {"layer_time_smooth_adjust_bridges", boolean(ui.adjust_bridges)},
+                    {"layer_time_smooth_adjust_gap_fill", boolean(ui.adjust_gap_fill)},
+                    {"layer_time_smooth_keep_min_speed", boolean(ui.keep_min_speed)},
+                    {"layer_time_smooth_write_layer_report", boolean(ui.write_layer_report)}
+                });
+                m_layer_time_smooth_error.clear();
+                _load_layer_time_smooth_menu_settings();
+            } catch (const std::exception& error) {
+                m_layer_time_smooth_error = error.what();
+            }
+        }
+    }
+    ImGui::SameLine();
+    if (imgui->button(_L("Reload"))) _load_layer_time_smooth_menu_settings();
+    imgui->text(_L("Re-slice to refresh G-code and Preview."));
+    if (!m_layer_time_smooth_error.empty())
+        ImGui::TextWrapped("%s", m_layer_time_smooth_error.c_str());
+    imgui->end();
+    ImGuiWrapper::pop_toolbar_style();
+}
+
 //BBS: GUI refactor: adjust main toolbar position
 void GLCanvas3D::_render_arrange_menu(float left, float right, float bottom, float top)
 {
@@ -7487,6 +7624,10 @@ void GLCanvas3D::_switch_toolbars_icon_filename()
 
         item = m_main_toolbar.get_item("layersediting");
         item->set_icon_filename(m_is_dark ? "toolbar_variable_layer_height_dark.svg" : "toolbar_variable_layer_height.svg");
+
+        // Keep the new Layer Time Smooth icon in sync with theme changes.
+        item = m_main_toolbar.get_item("layer_time_smooth");
+        item->set_icon_filename(m_is_dark ? "toolbar_layer_time_smooth_dark.svg" : "toolbar_layer_time_smooth.svg");
     }
 
     // assemble view toolbar
@@ -7684,6 +7825,24 @@ bool GLCanvas3D::_init_main_toolbar()
         return res;
     };
     item.enabling_callback = []()->bool { return wxGetApp().plater()->can_layers_editing(); };
+    if (!m_main_toolbar.add_item(item))
+        return false;
+
+    // Side-by-side with Variable Layer Height in the Prepare top toolbar.
+    // This is a process-preset operation rather than a model painting gizmo.
+    item.name = "layer_time_smooth";
+    item.icon_filename = m_is_dark ? "toolbar_layer_time_smooth_dark.svg" : "toolbar_layer_time_smooth.svg";
+    item.tooltip = _utf8(L("Layer Time Smooth"));
+    item.sprite_id++;
+    item.left.toggable = true;
+    item.left.action_callback = [this]() { _load_layer_time_smooth_menu_settings(); };
+    item.left.render_callback = [this](float left, float right, float bottom, float top) {
+        _render_layer_time_smooth_menu(left, right, bottom, top);
+    };
+    item.right.toggable = false;
+    item.right.render_callback = GLToolbarItem::Default_Render_Callback;
+    item.visibility_callback = [this]()->bool { return current_printer_technology() == ptFFF; };
+    item.enabling_callback = []()->bool { return wxGetApp().get_tab(Preset::TYPE_PRINT) != nullptr; };
     if (!m_main_toolbar.add_item(item))
         return false;
 

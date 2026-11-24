@@ -2081,6 +2081,23 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionBool,               single_loop_draft_shield))
     ((ConfigOptionFloat,              min_skirt_length))
     ((ConfigOptionFloats,             slow_down_layer_time))
+    ((ConfigOptionBool,               layer_time_smooth))
+    ((ConfigOptionFloat,              layer_time_smooth_max_variation))
+    ((ConfigOptionFloat,              layer_time_smooth_max_slowdown))
+    ((ConfigOptionFloat,              layer_time_smooth_min_speed))
+    ((ConfigOptionFloat,              layer_time_smooth_max_time_increase))
+    ((ConfigOptionInt,                layer_time_smooth_smoothing_radius))
+    ((ConfigOptionFloat,              layer_time_smooth_quality_speed))
+    ((ConfigOptionBool,               layer_time_smooth_preserve_outer_walls))
+    ((ConfigOptionBool,               layer_time_smooth_adjust_inner_walls))
+    ((ConfigOptionBool,               layer_time_smooth_adjust_infill))
+    ((ConfigOptionBool,               layer_time_smooth_adjust_top_surface))
+    ((ConfigOptionBool,               layer_time_smooth_adjust_support))
+    ((ConfigOptionBool,               layer_time_smooth_adjust_bridges))
+    ((ConfigOptionBool,               layer_time_smooth_adjust_gap_fill))
+    ((ConfigOptionBool,               layer_time_smooth_write_layer_report))
+    ((ConfigOptionBool,               layer_time_smooth_keep_min_speed))
+    ((ConfigOptionFloats,              layer_time_smooth_manual_profile))
     ((ConfigOptionBool,               spiral_mode))
     ((ConfigOptionBool,               spiral_mode_smooth))
     ((ConfigOptionFloatOrPercent,     spiral_mode_max_xy_smoothing))
@@ -2545,7 +2562,7 @@ private:
 bool is_XL_printer(const DynamicPrintConfig &cfg);
 bool is_XL_printer(const PrintConfig &cfg);
 
-Polygon get_shared_poly(const std::vector<Pointfs>& extruder_polys);
+Polygon get_shared_poly(const std::vector<Pointfs>& extruder_polys, const Pointfs& fallback_area);
 Points get_bed_shape(const DynamicPrintConfig &cfg, bool use_share = true);
 Points get_bed_shape(const PrintConfig &cfg, bool use_share = false);
 Points get_bed_shape(const SLAPrinterConfig &cfg);

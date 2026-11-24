@@ -464,6 +464,9 @@ void GLGizmoPaintedConnector::generate_connectors()
 
         const indexed_triangle_set selected = m_triangle_selectors[selector_idx++]->get_facets(EnforcerBlockerType::ENFORCER);
         const Transform3d volume_to_world = object_to_world * volume->get_matrix();
+        // Mirrored instances reverse triangle winding. Restore outward normals
+        // before extracting the offset surface in world coordinates.
+        const bool mirrored = volume_to_world.linear().determinant() < 0.0;
         const auto& vertices = selected.vertices;
 
         for (const Vec3i32& face : selected.indices) {
@@ -472,8 +475,8 @@ void GLGizmoPaintedConnector::generate_connectors()
             const Vec3d c = volume_to_world * vertices[face(2)].cast<double>();
             painted.push_back({
                 {a.x(), a.y(), a.z()},
-                {b.x(), b.y(), b.z()},
-                {c.x(), c.y(), c.z()}
+                mirrored ? Slic3r::Connector::Vec3{c.x(), c.y(), c.z()} : Slic3r::Connector::Vec3{b.x(), b.y(), b.z()},
+                mirrored ? Slic3r::Connector::Vec3{b.x(), b.y(), b.z()} : Slic3r::Connector::Vec3{c.x(), c.y(), c.z()}
             });
         }
     }

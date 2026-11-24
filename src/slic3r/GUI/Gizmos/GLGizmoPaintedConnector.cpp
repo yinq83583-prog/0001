@@ -339,12 +339,15 @@ void GLGizmoPaintedConnector::on_render_input_window(float x, float y, float bot
 
     ImGui::SameLine();
     GLGizmoUtils::begin_right_aligned_buttons({_L("Done")});
-    if (m_imgui->button(_L("Done"))) {
-        m_parent.reset_all_gizmos();
-    }
+    const bool done_clicked = m_imgui->button(_L("Done"));
 
     ImGui::PopStyleVar(1); // ImGuiStyleVar_FramePadding
     GizmoImguiEnd();
+    if (done_clicked) {
+        ImGuiWrapper::pop_toolbar_style();
+        m_parent.reset_all_gizmos();
+        return;
+    }
 
     // Keep extraction parameters in a separate, movable tool window. The
     // painting toolbar remains compact while the settings stay accessible.
@@ -358,10 +361,8 @@ void GLGizmoPaintedConnector::on_render_input_window(float x, float y, float bot
             bool connector_options_committed = false;
             ImGui::DragFloat("Fit gap (mm)##connector", &m_connector_fit_gap_mm, 0.01f, 0.0f, 5.0f, "%.2f");
             connector_options_committed |= ImGui::IsItemDeactivatedAfterEdit();
-            ImGui::SameLine();
             ImGui::DragFloat("Max bridge (mm)##connector", &m_connector_bridge_distance_mm, 0.5f, 0.0f, 200.0f, "%.1f");
             connector_options_committed |= ImGui::IsItemDeactivatedAfterEdit();
-            ImGui::SameLine();
             ImGui::DragFloat("Bed flare (mm)##connector", &m_connector_bed_flare_mm, 0.05f, 0.0f, 10.0f, "%.2f");
             connector_options_committed |= ImGui::IsItemDeactivatedAfterEdit();
             ImGui::PopItemWidth();

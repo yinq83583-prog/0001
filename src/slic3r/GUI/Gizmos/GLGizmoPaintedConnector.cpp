@@ -279,6 +279,8 @@ void GLGizmoPaintedConnector::on_render_input_window(float x, float y, float bot
         ImGui::SameLine(drag_left_width + cursor_slider_left);
         ImGui::PushItemWidth(1.5 * slider_icon_width);
         ImGui::BBLDragFloat("##cursor_radius_input", &m_cursor_radius, 0.05f, 0.0f, 0.0f, "%.2f");
+        ImGui::PopItemWidth();
+        ImGui::PopItemWidth();
     } else if (m_current_tool == ImGui::TriangleButtonIcon) {
         m_cursor_type = TriangleSelector::CursorType::POINTER;
         m_tool_type   = ToolType::BRUSH;
@@ -303,6 +305,8 @@ void GLGizmoPaintedConnector::on_render_input_window(float x, float y, float bot
         ImGui::SameLine(drag_left_width + sliders_left_width);
         ImGui::PushItemWidth(1.5 * slider_icon_width);
         ImGui::BBLDragFloat("##smart_fill_angle_input", &m_smart_fill_angle, 0.05f, 0.0f, 0.0f, "%.2f");
+        ImGui::PopItemWidth();
+        ImGui::PopItemWidth();
     }
 
     ImGui::Separator();
@@ -503,6 +507,9 @@ void GLGizmoPaintedConnector::generate_connectors()
     connector_its.vertices.reserve(generated.triangles.size() * 3);
     connector_its.indices.reserve(generated.triangles.size());
     const Transform3d world_to_object = object_to_world.inverse();
+    // Conversion back into a mirrored instance's local coordinates reverses
+    // winding again. Keep the stored mesh outward-oriented for slicing.
+    const bool mirrored_instance = object_to_world.linear().determinant() < 0.0;
 
     for (const auto& triangle : generated.triangles) {
         const std::array<Slic3r::Connector::Vec3, 3> points = {triangle.a, triangle.b, triangle.c};
@@ -511,7 +518,10 @@ void GLGizmoPaintedConnector::generate_connectors()
             const Vec3d world(point.x, point.y, point.z);
             connector_its.vertices.emplace_back((world_to_object * world).cast<float>());
         }
-        connector_its.indices.emplace_back(first, first + 1, first + 2);
+        if (mirrored_instance)
+            connector_its.indices.emplace_back(first, first + 2, first + 1);
+        else
+            connector_its.indices.emplace_back(first, first + 1, first + 2);
     }
 
     // TriangleMesh expects a shared indexed topology. The geometry core

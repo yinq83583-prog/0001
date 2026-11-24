@@ -6819,6 +6819,116 @@ void PrintConfigDef::init_fff_params()
     def->mode = comSimple;
     def->set_default_value(new ConfigOptionFloats { 5.0f });
 
+    def = this->add("layer_time_smooth", coBool);
+    def->label = L("Smooth layer time transitions");
+    def->category = L("Speed");
+    def->tooltip = L("Smooth large print-time differences between adjacent layers by adjusting eligible extrusion feedrates in exported G-code.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("layer_time_smooth_max_variation", coFloat);
+    def->label = L("Maximum adjacent layer time change");
+    def->category = L("Speed");
+    def->tooltip = L("Target maximum print-time difference between adjacent layers before smoothing is applied.");
+    def->sidetext = L("%");
+    def->min = 0; def->max = 100; def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(25.0));
+
+    def = this->add("layer_time_smooth_max_slowdown", coFloat);
+    def->label = L("Maximum slowdown");
+    def->category = L("Speed");
+    def->sidetext = L("%");
+    def->min = 0; def->max = 70; def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(30.0));
+
+    def = this->add("layer_time_smooth_min_speed", coFloat);
+    def->label = L("Minimum extrusion speed");
+    def->category = L("Speed");
+    def->sidetext = L("mm/s");
+    def->min = 1; def->max = 100; def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(18.0));
+
+    def = this->add("layer_time_smooth_max_time_increase", coFloat);
+    def->label = L("Maximum total time increase");
+    def->category = L("Speed");
+    def->sidetext = L("%");
+    def->min = 0; def->max = 50; def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(15.0));
+
+    def = this->add("layer_time_smooth_smoothing_radius", coInt);
+    def->label = L("Smoothing radius");
+    def->category = L("Speed");
+    def->sidetext = L("layers");
+    def->min = 1; def->max = 20; def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(5));
+
+    def = this->add("layer_time_smooth_quality_speed", coFloat);
+    def->label = L("Smoothing strength");
+    def->category = L("Speed");
+    def->min = 0; def->max = 1; def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.5));
+
+    def = this->add("layer_time_smooth_preserve_outer_walls", coBool);
+    def->label = L("Preserve outer walls");
+    def->category = L("Speed");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    def = this->add("layer_time_smooth_adjust_inner_walls", coBool);
+    def->label = L("Adjust inner walls");
+    def->category = L("Speed");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    def = this->add("layer_time_smooth_adjust_infill", coBool);
+    def->label = L("Adjust infill");
+    def->category = L("Speed");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    def = this->add("layer_time_smooth_adjust_top_surface", coBool);
+    def->label = L("Adjust top surfaces");
+    def->category = L("Speed");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    def = this->add("layer_time_smooth_adjust_support", coBool);
+    def->label = L("Adjust support");
+    def->category = L("Speed");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("layer_time_smooth_adjust_bridges", coBool);
+    def->label = L("Adjust bridges");
+    def->category = L("Speed");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("layer_time_smooth_adjust_gap_fill", coBool);
+    def->label = L("Adjust gap fill");
+    def->category = L("Speed");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("layer_time_smooth_write_layer_report", coBool);
+    def->label = L("Write layer-time report to G-code");
+    def->category = L("Speed");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    def = this->add("layer_time_smooth_keep_min_speed", coBool);
+    def->label = L("Enforce minimum speed");
+    def->category = L("Speed");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    def = this->add("layer_time_smooth_manual_profile", coFloats);
+    def->label = L("Manual layer smoothing profile");
+    def->category = L("Speed");
+    def->tooltip = L("64 normalized values from the bottom to the top of the model. 1 keeps full smoothing strength; 0 disables smoothing at that height.");
+    def->min = 0; def->max = 1; def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloats(64, 1.0));
+
     def = this->add("minimum_sparse_infill_area", coFloat);
     def->label = L("Minimum sparse infill threshold");
     def->category = L("Strength");
@@ -13788,22 +13898,38 @@ static Points to_points(const std::vector<Vec2d> &dpts)
     return pts;
 }
 
-Polygon get_shared_poly(const std::vector<Pointfs>& extruder_polys)
+Polygon get_shared_poly(const std::vector<Pointfs>& extruder_polys, const Pointfs& fallback_area)
 {
+    const auto fallback_to_bed = [&]() {
+        Polygon fallback_poly;
+        fallback_poly.points = to_points(make_counter_clockwise(fallback_area));
+        return fallback_poly;
+    };
+
     Polygon result;
-    for (int index = 0; index < extruder_polys.size(); index++)
-    {
-        const Pointfs& extruder_area = extruder_polys[index];
-        if (index == 0)
-            result.points = to_points(extruder_area);
-        else {
-            Polygon extruer_poly;
-            extruer_poly.points = to_points(extruder_area);
-            Polygons result_polygon = intersection(extruer_poly, result);
-            result = result_polygon[0];
+    bool has_result = false;
+    for (const Pointfs& extruder_area : extruder_polys) {
+        Polygon extruder_poly;
+        extruder_poly.points = to_points(extruder_area);
+        if (extruder_poly.points.size() < 3)
+            return fallback_to_bed();
+
+        if (!has_result) {
+            result = std::move(extruder_poly);
+            has_result = true;
+            continue;
         }
+
+        // Two extruder beds may only touch at an edge, producing no polygon.
+        // Do not index an empty intersection result; use the configured bed as a safe fallback.
+        Polygons result_polygon = intersection(extruder_poly, result);
+        if (result_polygon.empty() || result_polygon.front().points.size() < 3)
+            return fallback_to_bed();
+
+        result = std::move(result_polygon.front());
     }
-    return result;
+
+    return has_result && result.points.size() >= 3 ? result : fallback_to_bed();
 }
 Points get_bed_shape(const DynamicPrintConfig &config, bool use_share)
 {
@@ -13823,7 +13949,7 @@ Points get_bed_shape(const DynamicPrintConfig &config, bool use_share)
         const ConfigOptionPointsGroups *extruder_area_opt = config.opt<ConfigOptionPointsGroups>("extruder_printable_area");
         if (extruder_area_opt && (extruder_area_opt->size() > 0)) {
             const std::vector<Pointfs>& extruder_areas = extruder_area_opt->values;
-            bed_poly = get_shared_poly(extruder_areas);
+            bed_poly = get_shared_poly(extruder_areas, bed_shape_opt->values);
         }
         else
             bed_poly.points = to_points(make_counter_clockwise(bed_shape_opt->values));
@@ -13840,7 +13966,7 @@ Points get_bed_shape(const PrintConfig &cfg, bool use_share)
     if (use_share) {
         const std::vector<Pointfs>& extruder_areas = cfg.extruder_printable_area.values;
         if (extruder_areas.size() > 0) {
-            bed_poly = get_shared_poly(extruder_areas);
+            bed_poly = get_shared_poly(extruder_areas, cfg.printable_area.values);
         }
         else
             bed_poly.points = to_points(make_counter_clockwise(cfg.printable_area.values));

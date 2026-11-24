@@ -6,7 +6,9 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include "catch2/catch_approx.hpp"
+#include "libslic3r/libslic3r.h"
 #include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/Point.hpp"
 #include "libslic3r/PrintConfigConstants.hpp"
 #include "libslic3r/LocalesUtils.hpp"
 
@@ -19,6 +21,7 @@
 
 #include <boost/nowide/fstream.hpp>
 #include "libslic3r/Config.hpp"
+#include <algorithm>
 #include <cstddef>
 #include <initializer_list>
 #include <memory>
@@ -300,6 +303,51 @@ TEST_CASE("Flush-volume warning predicate respects used filament transitions", "
         const std::vector<int> used_filaments = {1, 2};
 
         REQUIRE(has_zero_flush_volume_for_used_filaments(matrix, zero_multiplier, used_filaments));
+    }
+}
+
+TEST_CASE("get_bed_shape falls back when extruder printable areas do not overlap", "[Config][Regression]")
+{
+    const std::vector<Vec2d> base_bed = {
+        Vec2d(0., 0.), Vec2d(350., 0.), Vec2d(350., 350.), Vec2d(0., 350.)
+    };
+    const std::vector<Vec2ds> extruder_areas = {
+        { Vec2d(0., 0.), Vec2d(175., 0.), Vec2d(175., 350.), Vec2d(0., 350.) },
+        { Vec2d(175., 0.), Vec2d(350., 0.), Vec2d(350., 350.), Vec2d(175., 350.) }
+    };
+
+    auto check_base_bed_fallback = [&](const Points& bed) {
+        REQUIRE(bed.size() == base_bed.size());
+        coord_t min_x = bed.front().x();
+        coord_t max_x = min_x;
+        coord_t min_y = bed.front().y();
+        coord_t max_y = min_y;
+        for (const Point& point : bed) {
+            min_x = std::min(min_x, point.x());
+            max_x = std::max(max_x, point.x());
+            min_y = std::min(min_y, point.y());
+            max_y = std::max(max_y, point.y());
+        }
+        CHECK(min_x == scale_(0.));
+        CHECK(max_x == scale_(350.));
+        CHECK(min_y == scale_(0.));
+        CHECK(max_y == scale_(350.));
+    };
+
+    SECTION("DynamicPrintConfig")
+    {
+        DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
+        config.opt<ConfigOptionPoints>("printable_area")->values = base_bed;
+        config.opt<ConfigOptionPointsGroups>("extruder_printable_area")->values = extruder_areas;
+        check_base_bed_fallback(get_bed_shape(config, true));
+    }
+
+    SECTION("PrintConfig")
+    {
+        PrintConfig config;
+        config.printable_area.values = base_bed;
+        config.extruder_printable_area.values = extruder_areas;
+        check_base_bed_fallback(get_bed_shape(config, true));
     }
 }
 

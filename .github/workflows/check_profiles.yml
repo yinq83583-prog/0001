@@ -32,6 +32,10 @@ on:
 permissions:
   contents: read
 
+# Keep one profile check running and only the newest update pending per PR.
+concurrency:
+  group: check-profiles-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   check_profiles:
@@ -90,10 +94,13 @@ jobs:
         run: |
           set -o pipefail
           base="${{ runner.temp }}/v2.4.2"
-          git fetch --no-tags --depth=1 origin refs/tags/v2.4.2:refs/tags/v2.4.2
           mkdir -p "$base"
-          git archive v2.4.2 resources/profiles | tar -x -C "$base"
-          python3 ./scripts/orca_profile_tool.py legacy-compat --base "$base/resources/profiles" --check 2>&1 | tee ${{ runner.temp }}/legacy_compat.log
+          {
+            # The release tag lives in upstream; fork repositories do not necessarily mirror tags.
+            git fetch --no-tags --depth=1 https://github.com/OrcaSlicer/OrcaSlicer.git refs/tags/v2.4.2:refs/tags/v2.4.2
+            git archive v2.4.2 resources/profiles | tar -x -C "$base"
+            python3 ./scripts/orca_profile_tool.py legacy-compat --base "$base/resources/profiles" --check
+          } 2>&1 | tee ${{ runner.temp }}/legacy_compat.log
 
       # download
       - name: Download

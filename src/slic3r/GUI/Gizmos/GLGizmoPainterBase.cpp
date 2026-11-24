@@ -142,7 +142,7 @@ void GLGizmoPainterBase::render_triangles(const Selection& selection, const std:
     const ModelObject* mo = m_c->selection_info()->model_object();
     int                mesh_id = -1;
     for (const ModelVolume* mv : mo->volumes) {
-        if (!mv->is_model_part())
+        if (!is_paintable_volume(mv))
             continue;
 
         ++mesh_id;
@@ -196,7 +196,7 @@ std::vector<Transform3d> GLGizmoPainterBase::mesh_trafo_matrices() const
 
     std::vector<Transform3d> trafo_matrices;
     for (const ModelVolume* mv : mo->volumes) {
-        if (mv->is_model_part())
+        if (is_paintable_volume(mv))
         {
             if (m_parent.get_canvas_type() == GLCanvas3D::CanvasAssembleView) {
                 Transform3d temp = mi->get_assemble_transformation().get_matrix() * mv->get_matrix();
@@ -823,7 +823,7 @@ bool GLGizmoPainterBase::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
         std::vector<Transform3d> trafo_matrices;
         std::vector<Transform3d> trafo_matrices_not_translate;
         for (const ModelVolume *mv : mo->volumes)
-            if (mv->is_model_part()) {
+            if (is_paintable_volume(mv)) {
                 if (m_parent.get_canvas_type() == GLCanvas3D::CanvasAssembleView) {
                     Transform3d temp = instance_trafo * mv->get_matrix();
                     temp.translate(mv->get_transformation().get_offset() * (GLVolume::explosion_ratio - 1.0) + mi->get_offset_to_assembly() * (GLVolume::explosion_ratio - 1.0));
@@ -971,7 +971,7 @@ bool GLGizmoPainterBase::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
         std::vector<Transform3d> trafo_matrices;
         std::vector<Transform3d> trafo_matrices_not_translate;
         for (const ModelVolume *mv : mo->volumes)
-            if (mv->is_model_part()) {
+            if (is_paintable_volume(mv)) {
                 if (m_parent.get_canvas_type() == GLCanvas3D::CanvasAssembleView) {
                     Transform3d temp = instance_trafo * mv->get_matrix();
                     temp.translate(mv->get_transformation().get_offset() * (GLVolume::explosion_ratio - 1.0) + mi->get_offset_to_assembly() * (GLVolume::explosion_ratio - 1.0));

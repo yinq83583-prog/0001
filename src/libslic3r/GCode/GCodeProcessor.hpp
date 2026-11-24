@@ -1470,7 +1470,7 @@ inline constexpr float DEFAULT_FILAMENT_DENSITY = 1.245f;
             assert(m_result.moves.empty());
             m_result.moves.emplace_back(GCodeProcessorResult::MoveVertex());
         }
-        void process_buffer(const std::string& buffer);
+        void process_buffer(const std::string& buffer, bool producers_enabled = false);
         void finalize(bool post_process);
 
         double get_time(PrintEstimatedStatistics::ETimeMode mode) const;

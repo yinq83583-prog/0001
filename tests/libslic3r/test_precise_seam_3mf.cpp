@@ -45,6 +45,7 @@ struct Scene {
     Model model;
     DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
     bool share_mesh = false;
+    bool split_model = false;
 
     Scene()
     {
@@ -92,6 +93,7 @@ void save(const std::string &path, Backend backend, Scene &scene)
         params.config = &scene.config;
         params.strategy = SaveStrategy::Zip64 | SaveStrategy::Silence;
         if (scene.share_mesh) params.strategy = params.strategy | SaveStrategy::ShareMesh;
+        if (scene.split_model) params.strategy = params.strategy | SaveStrategy::SplitModel;
         REQUIRE(store_bbs_3mf(params));
     }
 }
@@ -381,4 +383,101 @@ TEST_CASE("Seam metadata restores only recognized modes on compatible base types
         CHECK_FALSE(helper.config.has("sparse_infill_density"));
         CHECK_FALSE(helper.config.has("notes"));
     }
+}
+
+TEST_CASE("Painted Surface Connector annotations survive BBS split-model 3MF round trip", "[PaintedSurfaceConnector3mf][BBS]")
+{
+    Scene source;
+    source.populate(true, true);
+    source.split_model = true;
+    REQUIRE(source.model.objects.size() == 1);
+    ModelObject &object = *source.model.objects.front();
+    REQUIRE(object.volumes.size() == 7);
+    // A painted, unsplit triangle in state 1 is encoded as hex 4 (state << 2).
+    // Hex 1 is a split marker without child nodes and is malformed.
+    object.volumes[1]->connector_facets.set_triangle_from_string(0, "4");
+    object.volumes[2]->connector_facets.set_triangle_from_string(1, "4");
+    object.volumes[3]->connector_facets.set_triangle_from_string(0, "4");
+
+    ScopedTemporaryFile file(".3mf");
+    save(file.string(), Backend::Bbs, source);
+    Archive archive = read_archive(file.string());
+    CHECK(std::any_of(archive.begin(), archive.end(), [](const auto &entry) {
+        return entry.first.find("3D/Objects/") == 0 &&
+               entry.second.find("paint_connector=\"4\"") != std::string::npos;
+    }));
+
+    Scene destination;
+    load(file.string(), Backend::Bbs, destination);
+    REQUIRE(destination.model.objects.size() == 1);
+    REQUIRE(destination.model.objects.front()->volumes.size() == 7);
+    const auto &restored = destination.model.objects.front()->volumes;
+    CHECK(restored[1]->connector_facets.get_triangle_as_string(0) == "4");
+    CHECK(restored[1]->connector_facets.get_triangle_as_string(1).empty());
+    CHECK(restored[2]->connector_facets.get_triangle_as_string(0).empty());
+    CHECK(restored[2]->connector_facets.get_triangle_as_string(1) == "4");
+    CHECK(restored[3]->connector_facets.get_triangle_as_string(0) == "4");
+    CHECK(destination.model.is_connector_painted());
+}
+
+TEST_CASE("Painted Surface Connector annotations survive BBS and Prusa 3MF round trips", "[PaintedSurfaceConnector3mf]")
+{
+    const auto backend = GENERATE(Backend::Bbs, Backend::Prusa);
+    const bool shared = GENERATE(false, true);
+    CAPTURE(int(backend), shared);
+    Scene source;
+    source.populate(true, shared);
+    REQUIRE(source.model.objects.size() == 1);
+    ModelObject &object = *source.model.objects.front();
+    REQUIRE(object.volumes.size() == 7);
+
+    // Three helper volumes share the same mesh when requested. Different paint masks
+    // must force distinct BBS mesh resources; an identical mask may still share safely.
+    object.volumes[1]->connector_facets.set_triangle_from_string(0, "4");
+    object.volumes[2]->connector_facets.set_triangle_from_string(1, "4");
+    object.volumes[3]->connector_facets.set_triangle_from_string(0, "4");
+    REQUIRE(source.model.is_connector_painted());
+
+    ScopedTemporaryFile file(".3mf");
+    save(file.string(), backend, source);
+    Archive archive = read_archive(file.string());
+    const auto model_file = std::find_if(archive.begin(), archive.end(),
+        [](const auto &entry) { return entry.first == "3D/3dmodel.model"; });
+    REQUIRE(model_file != archive.end());
+    const std::string connector_attribute = backend == Backend::Bbs ?
+        "paint_connector=\"4\"" : "slic3rpe:connector_painting=\"4\"";
+    CHECK(model_file->second.find(connector_attribute) != std::string::npos);
+    if (backend == Backend::Prusa)
+        CHECK(model_file->second.find("name=\"slic3rpe:ConnectorPaintingVersion\">1</") != std::string::npos);
+
+    Scene destination;
+    load(file.string(), backend, destination);
+    REQUIRE(destination.model.objects.size() == 1);
+    REQUIRE(destination.model.objects.front()->volumes.size() == 7);
+    const auto &restored = destination.model.objects.front()->volumes;
+    CHECK(restored[1]->connector_facets.get_triangle_as_string(0) == "4");
+    CHECK(restored[1]->connector_facets.get_triangle_as_string(1).empty());
+    CHECK(restored[2]->connector_facets.get_triangle_as_string(0).empty());
+    CHECK(restored[2]->connector_facets.get_triangle_as_string(1) == "4");
+    CHECK(restored[3]->connector_facets.get_triangle_as_string(0) == "4");
+    for (size_t i = 4; i < restored.size(); ++i)
+        CHECK(restored[i]->connector_facets.get_triangle_as_string(0).empty());
+    CHECK(destination.model.is_connector_painted());
+
+    // A second export/import must not discard masks or merge distinct masks on shared meshes.
+    destination.share_mesh = shared;
+    ScopedTemporaryFile resaved_file(".3mf");
+    save(resaved_file.string(), backend, destination);
+    Scene reloaded;
+    load(resaved_file.string(), backend, reloaded);
+    REQUIRE(reloaded.model.objects.size() == 1);
+    REQUIRE(reloaded.model.objects.front()->volumes.size() == 7);
+    const auto &round_two = reloaded.model.objects.front()->volumes;
+    for (size_t i = 0; i < restored.size(); ++i) {
+        REQUIRE(round_two[i]->mesh().its.indices.size() == restored[i]->mesh().its.indices.size());
+        for (size_t triangle = 0; triangle < restored[i]->mesh().its.indices.size(); ++triangle)
+            CHECK(round_two[i]->connector_facets.get_triangle_as_string(triangle) ==
+                  restored[i]->connector_facets.get_triangle_as_string(triangle));
+    }
+    CHECK(reloaded.model.is_connector_painted());
 }

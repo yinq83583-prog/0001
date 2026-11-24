@@ -3300,6 +3300,27 @@ void TabPrint::build()
         optgroup->append_single_option_line("max_volumetric_extrusion_rate_slope_segment_length", "speed_settings_advanced");
         optgroup->append_single_option_line("extrusion_rate_smoothing_external_perimeter_only", "speed_settings_advanced#apply-only-on-external-features");
 
+        // Native post-generation feedrate smoothing. Kept under Process > Speed
+        // because these are print-process options, not filament cooling controls.
+        optgroup = page->new_optgroup(L("Layer time smoothing"), L"param_speed");
+        optgroup->append_single_option_line("layer_time_smooth");
+        optgroup->append_single_option_line("layer_time_smooth_max_variation");
+        optgroup->append_single_option_line("layer_time_smooth_max_slowdown");
+        optgroup->append_single_option_line("layer_time_smooth_min_speed");
+        optgroup->append_single_option_line("layer_time_smooth_max_time_increase");
+        optgroup->append_single_option_line("layer_time_smooth_smoothing_radius");
+        optgroup->append_single_option_line("layer_time_smooth_quality_speed");
+        optgroup->append_single_option_line("layer_time_smooth_preserve_outer_walls");
+        optgroup->append_single_option_line("layer_time_smooth_adjust_inner_walls");
+        optgroup->append_single_option_line("layer_time_smooth_adjust_infill");
+        optgroup->append_single_option_line("layer_time_smooth_adjust_top_surface");
+        optgroup->append_single_option_line("layer_time_smooth_adjust_support");
+        optgroup->append_single_option_line("layer_time_smooth_adjust_bridges");
+        optgroup->append_single_option_line("layer_time_smooth_adjust_gap_fill");
+        optgroup->append_single_option_line("layer_time_smooth_keep_min_speed");
+        optgroup->append_single_option_line("layer_time_smooth_write_layer_report");
+        optgroup->append_single_option_line("layer_time_smooth_manual_profile");
+
     page = add_options_page(L("Support"), "custom-gcode_support"); // ORCA: icon only visible on placeholders
         optgroup = page->new_optgroup(L("Support"), L"param_support");
         optgroup->append_single_option_line("enable_support", "support_settings_support");

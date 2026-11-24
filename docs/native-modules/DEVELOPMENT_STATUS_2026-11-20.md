@@ -1,0 +1,118 @@
+# OrcaSlicer v2.5.0 Native Modules — Development Checkpoint
+
+Date: 2026-11-20
+Canonical upstream baseline: `40ecc66f78ed72dc368e0c1ebe40d77f00cc8a19`
+Development branch: `feature/painted-surface-layer-time-smooth-v250`
+Frozen recovery checkpoint: `checkpoint/native-modules-2026-11-20-52eec1f`
+Checkpoint commit: `52eec1fb1470d013e30cdae8ba244324dcf8723f`
+Review PR: https://github.com/yinq83583-prog/0001/pull/2 (draft; release/orcaslicer-v2.5.0 base)
+
+## Implemented on development branch
+
+- Painted Surface Connector: native painting gizmo, independent paint annotation stored in 3MF, geometry generation for facing surfaces and optional down-to-bed regions.
+- Layer Time Smooth: native C++ G-code feedrate post-processing, print configuration entries, preview processor feedrate replay.
+- Regression tests: standalone GCC `-Wall -Wextra -Werror` checks for both modules; passing as of the checkpoint.
+- CMake integration for both native libraries and the connector gizmo.
+
+## Why CI appeared stuck
+
+1. `.github/workflows/build_all.yml` had `concurrency.cancel-in-progress: ${{ github.event_name == 'pull_request' }}`. Any new commit on PR #2 cancelled its preceding long-running Build all job before dependent Windows x64 compilation could finish.
+2. Clang-Tidy failures on PR #2 showed failure in `Restore the newest cached deps`, with `fail-on-cache-miss: true`. This is missing dependency cache, NOT proof of Clang-Tidy violations in native code.
+3. `Build all` launches expensive multi-platform dependency compilation. Standalone native tests are much quicker and have passed.
+
+Mitigation committed: set `concurrency.cancel-in-progress: false` in `.github/workflows/build_all.yml` on the development branch. This prevents incremental PR pushes from invalidating already-started heavy build jobs, but more than one build may consume CI runner time.
+
+## Remaining validation
+
+- Successful full OrcaSlicer Windows 11 x64 build and GUI launch.
+- Functional tests: 3MF roundtrip and undo/redo for connector painting.
+- Watertight/manifold geometry and collision checks on real model surfaces.
+- Preview of generated connectors and live viewport feedback.
+- Final G-code feedrate, time-limit and machine compatibility validation with actual OrcaSlicer output.
+- Clang-Tidy on a runner with a usable dependencies cache.
+
+Do not merge or use for physical printing until these checks pass. Preserve main and SLA/LCD modules.
+
+## Follow-up investigation and recovery — 2026-11-20
+
+Active development head at this checkpoint: `5db5c291f4ff6a91e1bd95b7de58c83dbfa24be5`.
+
+Additional frozen recovery branch:
+`checkpoint/native-modules-2026-11-20-5db5c29` (points exactly to the active head above; the earlier `52eec1f` checkpoint is retained).
+
+### CI queue diagnosis
+
+- The full `Build all` run #26 for commit `de1575ecf539` was still actively building dependencies when inspected. The Windows x64 dependency build had reached approximately 80% of 125 Assimp compilation tasks in its log at 2026-11-20 03:35:53 UTC; Linux, macOS, and Flatpak jobs were also active. This is long-running dependency compilation, not a C++ source error.
+- The latest full `Build all` run #29 for `5db5c291` was pending behind that active run. The workflow uses the per-PR concurrency group `build-all-pull_request-2` with `cancel-in-progress: false`. GitHub permits one running and one pending run per concurrency group; newer pending runs replace older pending runs, while the active run is allowed to finish. The latest head will therefore build after the active run releases the group.
+- The focused `Native Windows x64 build` run #2 was also still building Windows dependencies; run #5 for the latest head was pending behind it. This focused workflow duplicates part of the full Build all Windows x64 work and should be monitored for redundant runner use.
+- Native module regression tests passed on commit `f0e5dbab832a`; the run for `5db5c291` was queued at the time of inspection.
+
+### Corrected profile-check diagnosis
+
+The previous PR profile check was **not** failing because the legacy printer map was outdated. The log shows:
+`fatal: couldn't find remote ref refs/tags/v2.4.2`.
+The check attempted to fetch the release tag from the fork's `origin`, but that tag is absent in the fork. The tag exists in the canonical `OrcaSlicer/OrcaSlicer` repository. The workflow is now changed to fetch `v2.4.2` from that upstream repository, and the entire fetch/archive/check command is kept in the step log pipeline so future failures show their real cause.
+
+### Clang-Tidy diagnosis
+
+The previous Clang-Tidy run failed at `Restore the newest cached deps` because no compatible dependency cache was available. The configure and clang-tidy execution steps were skipped, so this run produced no C++ diagnostics. Re-run after the active dependency build/cache work completes; do not classify this as a code-clean result or as a C++ defect.
+
+### Next validation sequence
+
+1. Let the already-running full Build all and focused Windows x64 jobs finish without pushing unnecessary commits.
+2. Confirm the latest-head Build all run starts after the active per-PR concurrency slot is released.
+3. Confirm the fixed profile check can fetch upstream `v2.4.2` and run the compatibility-map comparison.
+4. Re-run Clang-Tidy after a matching Linux dependency cache is available.
+5. Inspect actual Windows x64 source compilation diagnostics, then fix only concrete compiler/test failures.
+6. Keep PR #2 draft and do not merge until full build, 3MF persistence, undo/redo, geometry manifoldness, and real G-code validation pass.
+
+## Further CI fixes — 2026-11-20
+
+The follow-up review identified additional causes of unnecessary CI churn and fixed them together:
+
+- **Clang-Tidy cache wait:** the workflow previously marked a PR as changing dependencies only when `deps/` changed, while `ci_deps_cache.sh` also fingerprints `.github/`. Because this PR changes workflow files, Clang-Tidy incorrectly looked for a base-branch cache instead of waiting for this PR's own Build all dependency job. It then failed at cache restore before running C++ analysis. The changed-file check now treats either `deps/` or `.github/` changes as requiring the PR's own cache, and Clang-Tidy no longer cancels its active run on each new commit.
+- **Profile-check queue:** added a per-PR concurrency group that lets the active check finish and retains only the newest pending run. The legacy-tag fetch now targets upstream and captures fetch/archive/check output in one log.
+- **Duplicate native tests:** the native module test workflow now runs on pull requests and manual dispatch, not both push and pull_request for the same PR commit. It also uses a per-PR concurrency group.
+- **Duplicate Windows build:** the focused Windows x64 workflow is now manual-only because Build all already performs the full Windows x64 matrix. This prevents future duplicate dependency builds while preserving a manual diagnostic build.
+
+The active full Build all run #26 and the focused Windows x64 run #2 were already in progress before these changes; they were left untouched. The latest full Build all run is expected to wait behind the active per-PR build group and then validate the current PR head. Existing queued runs created before these workflow changes may still complete or be superseded by newer pending runs.
+
+## Geometry safety validation — 2026-11-20
+
+A code review found that a painted region on a vertical wall can collapse to a zero-area footprint when projected onto the build plate. The previous implementation could emit an open or zero-volume connector shell because it only rejected degenerate individual triangles.
+
+The connector generator now validates every downward connector and bridge as a closed, consistently oriented, non-zero-volume triangle shell before adding it to the model. Downward connectors also reject painted regions that intersect or approach the build plate below the configured minimum height. Unsupported geometry is counted as skipped rather than emitted as a broken printable volume.
+
+Regression coverage added for vertical patches (must skip), sloped patches (must remain watertight), and patches intersecting the bed (must skip). The existing horizontal, facing-bridge, and mismatched-loop tests now check edge pairing, winding consistency, and non-zero signed volume.
+
+## CI log review and direct-include fixes — 2026-11-20
+
+Reviewed Build all run #26 and validation runs for head `3790bcde4b9af0f9c062bced37967918c62645a1`.
+
+- Native connector and layer-time-smooth tests (#144) passed, including compilation and execution of both standalone native test binaries.
+- Clang-Tidy (#32) successfully restored its dependency cache and configured. It then reported missing direct standard/library includes in the connector geometry source, layer-time-smooth source, and painted-connector gizmo. The source files were updated with the exact direct includes requested by include-cleaner: `<cstddef>`, `<vector>`, `<string>`, `<ios>`, `<iterator>`, and `libslic3r/Point.hpp`.
+- Windows ARM64 dependency build failed inside the third-party OCCT dependency: MSVC 14.52 emitted fatal internal compiler error C1001 in `BRepGraph_LayerTopoSupplement.cxx:32`, followed by an access violation. This is a compiler crash in the dependency build, not a diagnostic in the new native modules. Investigate a stable Windows ARM64 compiler/toolset or a narrowly scoped OCCT workaround separately.
+- Flatpak x86_64 and aarch64 both reached the Flatpak dependency build and then failed while `orca_deps` returned exit code 2; `xvfb-run` is only the wrapper reporting that child failure. Both logs show a Python NumPy import warning during OpenCV CMake configuration, but the available log excerpt does not yet prove that warning is the final cause. Do not change the Flatpak environment until the failing dependency target is identified.
+- The Linux ARM64 AppStream metadata message is a packaging warning and is separate from the failed Flatpak jobs.
+
+The full Build all run #32 for the current head was pending at the time of this checkpoint. Do not merge until a complete Windows x64 build and the remaining functional validations pass.
+
+## Flatpak dependency root-cause fix — 2026-11-20
+
+The Flatpak x86_64 and aarch64 logs were traced to the same confirmed dependency failure, not to `xvfb-run` or the new native modules:
+
+`dep_Boost` (Boost 1.84.0) fails during CMake configuration at `libs/locale/CMakeLists.txt:231`. Its `source_group(TREE ... include/boost/locale ...)` receives `include/boost/locale.hpp`, which is a sibling of the `include/boost/locale/` directory rather than a child. Newer CMake versions reject that path with “is not a prefix of file”. OpenCV completes successfully; the earlier missing-NumPy probe is a non-fatal configure warning and is not the cause.
+
+A narrow Boost patch now removes only `include/boost/locale.hpp` from the TREE source list. The existing explicit `source_group("headers" FILES "include/boost/locale.hpp")` continues to group that header separately. The patch is applied only to the Boost 1.84.0 dependency source during its ExternalProject patch step.
+
+The Windows ARM64 failure remains separate: MSVC 14.52 crashes internally (C1001) while compiling third-party OCCT `BRepGraph_LayerTopoSupplement.cxx`. The current Windows x64 build remains the release target and must pass independently.
+
+## Windows ARM64 compiler workaround — 2026-11-20
+
+The ARM64 dependency failure matches a reported regression in GitHub's `windows-11-vs2026-arm` runner image: MSVC 14.52.37025 crashes with C1001 in the compiler backend, while MSVC 14.44.35207 succeeds on the same image. The report reproduces the same compiler internal file (`Utc/src/p2/main.cpp`, line 281) as this run. Microsoft documents `-vcvars_ver=14.44` as the supported way to select an earlier installed toolset.
+
+`build_win.bat` now selects MSVC 14.44 for ARM64 only when the exact side-by-side toolset directory is present. Windows x64 and machines without that installation retain the normal default compiler. This avoids changing the x64 release toolchain while working around the hosted ARM64 compiler regression.
+
+## 3MF annotation regression test — 2026-11-20
+
+Added an integration-level 3MF round-trip test for Painted Surface Connector paint annotations using both the Bambu/BBS and Prusa 3MF backends. The test verifies the custom triangle attribute is written and that the same painted triangle is restored after import. This complements the standalone geometry tests; it still needs to run in the full OrcaSlicer test suite.
